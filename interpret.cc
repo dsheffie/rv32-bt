@@ -1,0 +1,595 @@
+#include "interpret.hh"
+#include <cassert>         // for assert
+#include <cmath>           // for isnan, sqrt
+#include <cstdio>          // for printf
+#include <cstdlib>         // for exit, abs
+#include <iostream>        // for operator<<, basic_ostream<>::__ostream_type
+#include <limits>          // for numeric_limits
+#include <string>          // for string
+#include <type_traits>     // for enable_if, is_integral
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include "basicBlock.hh"   // for basicBlock
+#include "disassemble.hh"  // for getCondName
+#include "helper.hh"       // for extractBit, UNREACHABLE, bswap, setBit
+#include "saveState.hh"    // for dumpState
+#include "state.hh"        // for state_t, operator<<
+#include "riscv.hh"
+#define ELIDE_LLVM
+#include "globals.hh"      // for cBB, blobName, isMipsEL
+
+/* stolen from libgloss-htif : syscall.h */
+#define SYS_getcwd 17
+#define SYS_fcntl 25
+#define SYS_mkdirat 34
+#define SYS_unlinkat 35
+#define SYS_linkat 37
+#define SYS_renameat 38
+#define SYS_ftruncate 46
+#define SYS_faccessat 48
+#define SYS_chdir 49
+#define SYS_open   55
+#define SYS_openat 56
+#define SYS_close 57
+#define SYS_lseek 62
+#define SYS_read 63
+#define SYS_write 64
+#define SYS_pread 67
+#define SYS_pwrite 68
+#define SYS_fstatat 79
+#define SYS_fstat 80
+#define SYS_exit 93
+#define SYS_lstat 1039
+#define SYS_getmainvars 2011
+
+struct stat32_t {
+  uint16_t st_dev;
+  uint16_t st_ino;
+  uint32_t st_mode;
+  uint16_t st_nlink;
+  uint16_t st_uid;
+  uint16_t st_gid;
+  uint16_t st_rdev;
+  uint32_t st_size;
+  uint32_t _st_atime;
+  uint32_t st_spare1;
+  uint32_t _st_mtime;
+  uint32_t st_spare2;
+  uint32_t _st_ctime;
+  uint32_t st_spare3;
+  uint32_t st_blksize;
+  uint32_t st_blocks;
+  uint32_t st_spare4[2];
+};
+
+template <bool appendIns>
+void execRiscv(state_t *s);
+
+static void getNextBlock(state_t *s) {
+  basicBlock *nBB = globals::cBB->findBlock(s->pc);
+  if(nBB == nullptr ) {
+    nBB = new basicBlock(s->pc, globals::cBB);
+  }
+  globals::cBB->setReadOnly();
+  globals::cBB = nBB;
+}
+
+
+
+template <bool appendIns>
+void execRiscv(state_t *s) {
+  uint8_t *mem = s->mem;
+  uint32_t inst = *reinterpret_cast<uint32_t*>(mem + s->pc);
+  if(appendIns) globals::cBB->addIns(inst, s->pc);
+  uint32_t opcode = inst & 127;
+  
+#if 0
+  std::cout << std::hex << s->pc << "\n";
+  for(int r = 0; r < 32; r++) {
+    std::cout << "\t" << s->gpr[r] << "\n";
+  }
+  std::cout << std::dec;
+#endif				    
+  
+  
+  uint64_t tohost = *reinterpret_cast<uint64_t*>(mem + globals::tohost_addr);
+  tohost &= ((1UL<<32)-1);
+  if(tohost) {
+    handle_syscall(s, tohost);
+  }
+
+
+  if(globals::log) {
+    std::cout << std::hex << s->pc << std::dec
+	      << " : " << getAsmString(inst, s->pc)
+	      << " , opcode " << std::hex
+	      << opcode
+	      << std::dec
+	      << " , icnt " << s->icnt
+	      << "\n";
+  }
+  s->last_pc = s->pc;  
+
+  uint32_t rd = (inst>>7) & 31;
+  riscv_t m(inst);
+
+#if OLD_GPR
+  int32_t old_gpr[32];
+  memcpy(old_gpr, s->gpr, 4*32);
+#endif
+  
+  switch(opcode)
+    {
+    case 0x3: {
+      if(m.l.rd != 0) {
+	int32_t disp = m.l.imm11_0;
+	if((inst>>31)&1) {
+	  disp |= 0xfffff000;
+	}
+	uint32_t ea = disp + s->gpr[m.l.rs1];
+	switch(m.s.sel)
+	  {
+	  case 0x0: /* lb */
+	    s->gpr[m.l.rd] = static_cast<int32_t>(*(reinterpret_cast<int8_t*>(s->mem + ea)));	 
+	    break;
+	  case 0x1: /* lh */
+	    s->gpr[m.l.rd] = static_cast<int32_t>(*(reinterpret_cast<int16_t*>(s->mem + ea)));	 
+	    break;
+	  case 0x2: /* lw */
+	    s->gpr[m.l.rd] = *(reinterpret_cast<int32_t*>(s->mem + ea));
+	    break;
+	  case 0x4: {/* lbu */
+	    uint32_t b = s->mem[ea];
+	    *reinterpret_cast<uint32_t*>(&s->gpr[m.l.rd]) = b;
+	    break;
+	  }
+	  case 0x5: { /* lhu */
+	    uint16_t b = *reinterpret_cast<uint16_t*>(s->mem + ea);
+	    *reinterpret_cast<uint32_t*>(&s->gpr[m.l.rd]) = b;
+	    break;
+	  }
+	  default:
+	    assert(0);
+	  }
+	s->pc += 4;
+	break;
+      }
+    }
+    case 0xf: { /* fence - there's a bunch of 'em */
+      s->pc += 4;
+      break;
+    }
+#if 0
+    imm[11:0] rs1 000 rd 0010011 ADDI
+    imm[11:0] rs1 010 rd 0010011 SLTI
+    imm[11:0] rs1 011 rd 0010011 SLTIU
+    imm[11:0] rs1 100 rd 0010011 XORI
+    imm[11:0] rs1 110 rd 0010011 ORI
+    imm[11:0] rs1 111 rd 0010011 ANDI
+    0000000 shamt rs1 001 rd 0010011 SLLI
+    0000000 shamt rs1 101 rd 0010011 SRLI
+    0100000 shamt rs1 101 rd 0010011 SRAI
+#endif
+    case 0x13: {
+      int32_t simm32 = (inst >> 20);
+
+      simm32 |= ((inst>>31)&1) ? 0xfffff000 : 0x0;
+      uint32_t subop =(inst>>12)&7;
+      uint32_t shamt = (inst>>20) & 31;
+
+      if(rd != 0) {
+	switch(m.i.sel)
+	  {
+	  case 0: /* addi */
+	    s->gpr[rd] = s->gpr[m.i.rs1] + simm32;
+	    break;
+	  case 1: /* slli */
+	    s->gpr[rd] = (*reinterpret_cast<uint32_t*>(&s->gpr[m.i.rs1])) << shamt;
+	    break;
+	  case 2: /* slti */
+	    s->gpr[rd] = (s->gpr[m.i.rs1] < simm32);
+	    break;
+	  case 3: { /* sltiu */
+	    uint32_t uimm32 = static_cast<uint32_t>(simm32);
+	    uint32_t u_rs1 = *reinterpret_cast<uint32_t*>(&s->gpr[m.i.rs1]);
+	    s->gpr[rd] = (u_rs1 < uimm32);
+	    break;
+	  }
+	  case 4: /* xori */
+	    s->gpr[rd] = s->gpr[m.i.rs1] ^ simm32;
+	    break;
+	  case 5: { /* srli & srai */
+	    uint32_t sel =  (inst >> 25) & 127;	    
+	    if(sel == 0) { /* srli */
+	      s->gpr[rd] = (*reinterpret_cast<uint32_t*>(&s->gpr[m.i.rs1]) >> shamt);
+	    }
+	    else if(sel == 32) { /* srai */
+	      s->gpr[rd] = s->gpr[m.i.rs1] >> shamt;
+	    }
+	    else {
+	      std::cout << "sel = " << sel << "\n";
+	      assert(0);
+	    }
+	    break;
+	  }
+	  case 6: /* ori */
+	    s->gpr[rd] = s->gpr[m.i.rs1] | simm32;
+	    break;
+	  case 7: /* andi */
+	    s->gpr[rd] = s->gpr[m.i.rs1] & simm32;
+	    break;
+	    
+	  default:
+	    std::cout << "implement case " << subop << "\n";
+	    assert(false);
+	  }
+      }
+      s->pc += 4;
+      break;
+    }
+    case 0x23: {
+      int32_t disp = m.s.imm4_0 | (m.s.imm11_5 << 5);
+      disp |= ((inst>>31)&1) ? 0xfffff000 : 0x0;
+      uint32_t ea = disp + s->gpr[m.s.rs1];
+      //std::cout << "STORE EA " << std::hex << ea << std::dec << "\n";      
+      switch(m.s.sel)
+	{
+	case 0x0: /* sb */
+	  s->mem[ea] = *reinterpret_cast<uint8_t*>(&s->gpr[m.s.rs2]);
+	  break;
+	case 0x1: /* sh */
+	  *(reinterpret_cast<uint16_t*>(s->mem + ea)) = *reinterpret_cast<uint16_t*>(&s->gpr[m.s.rs2]);
+	  break;
+	case 0x2: /* sw */
+	  *(reinterpret_cast<int32_t*>(s->mem + ea)) = s->gpr[m.s.rs2];
+	  break;
+	default:
+	  assert(0);
+	}
+      s->pc += 4;
+      break;
+    }
+      
+      //imm[31:12] rd 011 0111 LUI
+    case 0x37:
+      if(rd != 0) {
+	s->gpr[rd] = inst & 0xfffff000;
+      }
+      s->pc += 4;
+      break;
+      //imm[31:12] rd 0010111 AUIPC
+    case 0x17: /* is this sign extended */
+      if(rd != 0) {
+	uint32_t imm = inst & (~4095U);
+	uint32_t u = static_cast<uint32_t>(s->pc) + imm;
+	*reinterpret_cast<uint32_t*>(&s->gpr[rd]) = u;
+	//std::cout << "u = " << std::hex << u << std::dec << "\n";
+	//if(s->pc == 0x80000084) exit(-1);
+      }
+      s->pc += 4;
+      break;
+      
+      //imm[11:0] rs1 000 rd 1100111 JALR
+    case 0x67: {
+      if(appendIns) globals::cBB->setTermAddr(s->pc);      
+      int32_t tgt = m.jj.imm11_0;
+      tgt |= ((inst>>31)&1) ? 0xfffff000 : 0x0;
+      tgt += s->gpr[m.jj.rs1];
+      tgt &= ~(1U);
+      if(m.jj.rd != 0) {
+	s->gpr[m.jj.rd] = s->pc + 4;
+      }
+      s->pc = tgt;
+      getNextBlock(s);
+      break;
+    }
+
+      
+      //imm[20|10:1|11|19:12] rd 1101111 JAL
+    case 0x6f: {
+      if(appendIns) globals::cBB->setTermAddr(s->pc);      
+      int32_t jaddr =
+	(m.j.imm10_1 << 1)   |
+	(m.j.imm11 << 11)    |
+	(m.j.imm19_12 << 12) |
+	(m.j.imm20 << 20);
+      jaddr |= ((inst>>31)&1) ? 0xffe00000 : 0x0;
+      if(rd != 0) {
+	s->gpr[rd] = s->pc + 4;
+      }
+      s->pc += jaddr;
+      getNextBlock(s);
+      break;
+    }
+    case 0x33: {      
+      if(m.r.rd != 0) {
+	uint32_t u_rs1 = *reinterpret_cast<uint32_t*>(&s->gpr[m.r.rs1]);
+	uint32_t u_rs2 = *reinterpret_cast<uint32_t*>(&s->gpr[m.r.rs2]);
+	switch(m.r.sel)
+	  {
+	  case 0x0: /* add & sub */
+	    switch(m.r.special)
+	      {
+	      case 0x0: /* add */
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] + s->gpr[m.r.rs2];
+		break;
+	      case 0x1: /* mul */
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] * s->gpr[m.r.rs2];
+		break;
+	      case 0x20: /* sub */
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] - s->gpr[m.r.rs2];
+		break;
+	      default:
+		std::cout << "sel = " << m.r.sel << ", special = " << m.r.special << "\n";
+		assert(0);
+	      }
+	    break;
+	  case 0x1: /* sll */
+	    switch(m.r.special)
+	      {
+	      case 0x0:
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] << (s->gpr[m.r.rs2] & 31);
+		break;
+	      default:
+		std::cout << "sel = " << m.r.sel << ", special = " << m.r.special << "\n";
+		assert(0);
+	      }
+	    break;
+	  case 0x2: /* slt */
+	    switch(m.r.special)
+	      {
+	      case 0x0:
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] < s->gpr[m.r.rs2];
+		break;
+	      default:
+		std::cout << "sel = " << m.r.sel << ", special = " << m.r.special << "\n";
+		assert(0);		
+	      }
+	    break;
+	  case 0x3: /* sltu */
+	    switch(m.r.special)
+	      {
+	      case 0x0:
+		s->gpr[m.r.rd] = u_rs1 < u_rs2;
+		break;
+	      case 0x1: {/* MULHU */
+		uint64_t t = static_cast<uint64_t>(u_rs1) * static_cast<uint64_t>(u_rs2);
+		*reinterpret_cast<uint32_t*>(&s->gpr[m.r.rd]) = (t>>32);
+		break;
+	      }
+	      default:
+		std::cout << "sel = " << m.r.sel << ", special = " << m.r.special << "\n";
+		std::cout << "pc = " << std::hex << s->pc << std::dec << "\n";
+		assert(0);		
+	      }
+	    break;
+	  case 0x4:
+	    switch(m.r.special)
+	      {
+	      case 0x0:
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] ^ s->gpr[m.r.rs2];
+		break;
+	      case 0x1:
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] / s->gpr[m.r.rs2];
+		break;
+	      default:
+		std::cout << "sel = " << m.r.sel << ", special = " << m.r.special << "\n";
+		assert(0);		
+	      }
+	    break;		
+	  case 0x5: /* srl & sra */
+	    switch(m.r.special)
+	      {
+	      case 0x0: /* srl */
+		s->gpr[rd] = (*reinterpret_cast<uint32_t*>(&s->gpr[m.r.rs1]) >> (s->gpr[m.r.rs2] & 31));
+		break;
+	      case 0x1: {
+		*reinterpret_cast<uint32_t*>(&s->gpr[m.r.rd]) = u_rs1 / u_rs2;
+		break;
+	      }
+	      case 0x20: /* sra */
+		s->gpr[rd] = s->gpr[m.r.rs1] >> (s->gpr[m.r.rs2] & 31);
+		break;
+	      default:
+		std::cout << "sel = " << m.r.sel << ", special = " << m.r.special << "\n";
+		assert(0);				
+	      }
+	    break;
+	  case 0x6:
+	    switch(m.r.special)
+	      {
+	      case 0x0:
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] | s->gpr[m.r.rs2];
+		break;
+	      case 0x1:
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] % s->gpr[m.r.rs2];
+		break;		
+	      default:
+		std::cout << "sel = " << m.r.sel << ", special = " << m.r.special << "\n";
+		assert(0);
+	      }
+	    break;
+	  case 0x7:
+	    switch(m.r.special)
+	      {
+	      case 0x0:
+		s->gpr[m.r.rd] = s->gpr[m.r.rs1] & s->gpr[m.r.rs2];
+		break;
+	      case 0x1: { /* remu */
+		*reinterpret_cast<uint32_t*>(&s->gpr[m.r.rd]) = u_rs1 % u_rs2;
+		break;
+	      }
+	      default:
+		std::cout << "sel = " << m.r.sel << ", special = " << m.r.special << "\n";
+		assert(0);
+	      }
+	    break;
+	  default:
+	    std::cout << "implement = " << m.r.sel << "\n";
+	    assert(0);
+	  }
+      }
+      s->pc += 4;
+      break;
+    }
+#if 0
+    imm[12|10:5] rs2 rs1 000 imm[4:1|11] 1100011 BEQ
+    imm[12|10:5] rs2 rs1 001 imm[4:1|11] 1100011 BNE
+    imm[12|10:5] rs2 rs1 100 imm[4:1|11] 1100011 BLT
+    imm[12|10:5] rs2 rs1 101 imm[4:1|11] 1100011 BGE
+    imm[12|10:5] rs2 rs1 110 imm[4:1|11] 1100011 BLTU
+    imm[12|10:5] rs2 rs1 111 imm[4:1|11] 1100011 BGEU
+#endif
+    case 0x63: {
+      if(appendIns) globals::cBB->setTermAddr(s->pc);      
+      int32_t disp =
+	(m.b.imm4_1 << 1)  |
+	(m.b.imm10_5 << 5) |	
+        (m.b.imm11 << 11)  |
+        (m.b.imm12 << 12);
+      disp |= m.b.imm12 ? 0xffffe000 : 0x0;
+      bool takeBranch = false;
+      uint32_t u_rs1 = *reinterpret_cast<uint32_t*>(&s->gpr[m.b.rs1]);
+      uint32_t u_rs2 = *reinterpret_cast<uint32_t*>(&s->gpr[m.b.rs2]);
+      switch(m.b.sel)
+	{
+	case 0: /* beq */
+	  takeBranch = s->gpr[m.b.rs1] == s->gpr[m.b.rs2];
+	  break;
+	case 1: /* bne */
+	  takeBranch = s->gpr[m.b.rs1] != s->gpr[m.b.rs2];
+	  break;
+	case 4: /* blt */
+	  takeBranch = s->gpr[m.b.rs1] < s->gpr[m.b.rs2];
+	  break;
+	case 5: /* bge */
+	  takeBranch = s->gpr[m.b.rs1] >= s->gpr[m.b.rs2];	  
+	  break;
+	case 6: /* bltu */
+	  takeBranch = u_rs1 < u_rs2;
+	  break;
+	case 7: /* bgeu */
+	  takeBranch = u_rs1 >= u_rs2;
+	  //std::cout << "s->pc " << std::hex << s->pc << ", rs1 " << u_rs1 << ", rs2 "
+	  //<< u_rs2 << std::dec
+	  //	    << ", takeBranch " << takeBranch
+	  //<< "\n";
+
+	  break;
+	default:
+	  std::cout << "implement case " << m.b.sel << "\n";
+	  assert(0);
+	}
+      //assert(not(takeBranch));
+      s->pc = takeBranch ? disp + s->pc : s->pc + 4;
+      getNextBlock(s);
+      break;
+    }
+
+    case 0x73:
+      if((inst >> 7) == 0) {
+	s->brk = 1;
+      }
+      else {
+	s->pc += 4;
+      }
+      break;
+    
+    default:
+      std::cout << std::hex << s->pc << std::dec
+		<< " : " << getAsmString(inst, s->pc)
+		<< " , opcode " << std::hex
+		<< opcode
+		<< std::dec
+		<< " , icnt " << s->icnt
+		<< "\n";
+      std::cout << *s << "\n";
+      exit(-1);
+      break;
+    }
+
+  s->icnt++;
+#if OLD_GPR
+  for(int i = 0; i < 32; i++){
+    if(old_gpr[i] != s->gpr[i]) {
+      std::cout << "\t" << getGPRName(i) << " changed from "
+		<< std::hex
+		<< old_gpr[i]
+		<< " to "
+		<< s->gpr[i]
+		<< std::dec
+		<< "\n";
+    }
+  }
+#endif
+}
+
+void handle_syscall(state_t *s, uint64_t tohost) {
+  uint8_t *mem = s->mem;  
+  if(tohost & 1) {
+    /* exit */
+    s->brk = 1;
+    return;
+  }
+  uint64_t *buf = reinterpret_cast<uint64_t*>(mem + tohost);
+  switch(buf[0])
+    {
+    case SYS_write: /* int write(int file, char *ptr, int len) */
+      buf[0] = write(buf[1], (void*)(s->mem + buf[2]), buf[3]);
+      if(buf[1]==1)
+	fflush(stdout);
+      else if(buf[1]==2)
+	fflush(stderr);
+      break;
+    case SYS_open: {
+      const char *path = reinterpret_cast<const char*>(s->mem + buf[1]);
+      buf[0] = open(path, remapIOFlags(buf[2]), S_IRUSR|S_IWUSR);
+      break;
+    }
+    case SYS_close: {
+      buf[0] = close(buf[1]);
+      break;
+    }
+    case SYS_read: {
+      buf[0] = read(buf[1], reinterpret_cast<char*>(s->mem + buf[2]), buf[3]); 
+      break;
+    }
+    case SYS_fstat : {
+      struct stat native_stat;
+      stat32_t *host_stat = reinterpret_cast<stat32_t*>(s->mem + buf[2]);
+      int rc = fstat(buf[1], &native_stat);
+      host_stat->st_dev = native_stat.st_dev;
+      host_stat->st_ino = native_stat.st_ino;
+      host_stat->st_mode = native_stat.st_mode;
+      host_stat->st_nlink = native_stat.st_nlink;
+      host_stat->st_uid = native_stat.st_uid;
+      host_stat->st_gid = native_stat.st_gid;
+      host_stat->st_size = native_stat.st_size;
+      host_stat->_st_atime = native_stat.st_atime;
+      host_stat->_st_mtime = 0;
+      host_stat->_st_ctime = 0;
+      host_stat->st_blksize = native_stat.st_blksize;
+      host_stat->st_blocks = native_stat.st_blocks;
+      buf[0] = rc;
+      break;
+    }
+    default:
+      std::cout << "syscall " << buf[0] << " unsupported\n";
+      exit(-1);
+    }
+  //ack
+  *reinterpret_cast<uint64_t*>(mem + globals::tohost_addr) = 0;
+  *reinterpret_cast<uint64_t*>(mem + globals::fromhost_addr) = 1;
+}
+
+
+void interpretAndBuildCFG(state_t *s) {
+  execRiscv<true>(s);
+}
+
+void interpret(state_t *s) {
+  execRiscv<false>(s);
+}
+
