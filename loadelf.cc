@@ -166,7 +166,7 @@ void load_elf(const char* fn, state_t *ms) {
     sh32 = reinterpret_cast<Elf32_Shdr*>(buf + eh32->e_shoff);    
     char* strtab = buf + sh32[strtabidx].sh_offset;
     Elf32_Sym* sym = reinterpret_cast<Elf32_Sym*>(buf + sh32[symtabidx].sh_offset);
-    for(int32_t i = 0; i < (sh32[symtabidx].sh_size / sizeof(Elf32_Sym)); i++) {
+    for(uint32_t i = 0; i < (sh32[symtabidx].sh_size / sizeof(Elf32_Sym)); i++) {
       globals::symtab[strtab + sym[i].st_name] = static_cast<uint32_t>(sym[i].st_value);
     }
   }

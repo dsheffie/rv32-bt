@@ -18,7 +18,6 @@ void cfgBasicBlock::addWithInCFGEdges(regionCFG *cfg) {
   iBranchTypeInsn *iBranch = nullptr;
   jTypeInsn *jJump = nullptr;
   rTypeInsn *jrInsn = nullptr;
-  fpBranchInsn *fBranch = nullptr;
   std::map<uint32_t,cfgBasicBlock*>::iterator mit0,mit1;
   uint32_t tAddr=~0,ntAddr=~0;
 
@@ -30,8 +29,6 @@ void cfgBasicBlock::addWithInCFGEdges(regionCFG *cfg) {
     if(jJump) break;
     jrInsn = dynamic_cast<rTypeJumpRegInsn*>(insns[i]);
     if(jrInsn) break;
-    fBranch = dynamic_cast<fpBranchInsn*>(insns[i]);
-    if(fBranch) break;
   }
   
 #define PRINT_ADDED_EDGE(TGT) {\
@@ -44,21 +41,6 @@ void cfgBasicBlock::addWithInCFGEdges(regionCFG *cfg) {
     ntAddr = iBranch->getNotTakenAddr();
     mit0 = cfg->cfgBlockMap.find(tAddr);
     mit1 = cfg->cfgBlockMap.find(ntAddr);
-    if(mit0 != cfg->cfgBlockMap.end()) {
-      //PRINT_ADDED_EDGE(mit0->second);
-      addSuccessor(mit0->second); 
-    }
-    if(mit1 != cfg->cfgBlockMap.end()) {
-      //PRINT_ADDED_EDGE(mit1->second);
-      addSuccessor(mit1->second); 
-    }
-  }
-  else if(fBranch) {
-    tAddr = fBranch->getTakenAddr();
-    ntAddr = fBranch->getNotTakenAddr();
-    mit0 = cfg->cfgBlockMap.find(tAddr);
-    mit1 = cfg->cfgBlockMap.find(ntAddr);
-
     if(mit0 != cfg->cfgBlockMap.end()) {
       //PRINT_ADDED_EDGE(mit0->second);
       addSuccessor(mit0->second); 
@@ -136,15 +118,7 @@ void cfgBasicBlock::addPhiNode(gprPhiNode *phi) {
     gprPhis[r] = phi;
   }
 }
-void cfgBasicBlock::addPhiNode(hiloPhiNode *phi) {
-  uint32_t r = phi->destRegister();
-  if(hiLoPhis[r])
-    delete phi;
-  else {
-    phiNodes.push_back(phi);
-    hiLoPhis[r] = phi;
-  }
-}
+
 void cfgBasicBlock::addPhiNode(fprPhiNode *phi) {
   uint32_t r = phi->destRegister();
   if(fprPhis[r])
@@ -391,7 +365,6 @@ cfgBasicBlock::cfgBasicBlock(basicBlock *bb, bool isLikelyPatch) :
   gprPhis.fill(nullptr);
   fprPhis.fill(nullptr);
   fcrPhis.fill(nullptr);
-  hiLoPhis.fill(nullptr);
   icntPhis.fill(nullptr);
   
   for(size_t i = 0; i < 32; i++) {
@@ -411,9 +384,6 @@ cfgBasicBlock::cfgBasicBlock(basicBlock *bb, bool isLikelyPatch) :
       rawInsns.push_back(bb->getVecIns()[numInsns-1]);
     }
     else {
-      if(bb->hasBranchLikely()) {
-	numInsns--;
-      }
       for(ssize_t i = 0; i < numInsns; i++) {
 	const basicBlock::insPair &p = bb->getVecIns()[i];
 	rawInsns.push_back(p);
@@ -533,10 +503,6 @@ void cfgBasicBlock::traverseAndRename(regionCFG *cfg){
     if(cfg->allGprRead[i] or not(cfg->gprDefinitionBlocks[i].empty())) {
       regTbl.loadGPR(i);
     }
-  }
-  if(cfg->allHiloRead[0] or not(cfg->hiloDefinitionBlocks.empty()) ) {
-    regTbl.loadHiLo(0);
-    regTbl.loadHiLo(1);
   }
   for(size_t i = 0; i < 32; i++) {
     if(cfg->allFprRead[i] or not(cfg->fprDefinitionBlocks[i].empty())) {

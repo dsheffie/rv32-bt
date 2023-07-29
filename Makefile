@@ -27,8 +27,8 @@ CXXFLAGS = -std=c++14 -g $(OPT) $(LLVM_CXXFLAGS)
 
 
 OPT = -O3 -g -Wall -Wpedantic -Wextra -Wno-unused-parameter 
-EXE = cfg_mips
-OBJ = main.o cfgBasicBlock.o loadelf.o disassemble.o helper.o interpret.o basicBlock.o compile.o region.o mipsInstruction.o regionCFG.o perfmap.o debugSymbols.o saveState.o simPoints.o githash.o state.o
+EXE = cfg_rv32
+OBJ = main.o cfgBasicBlock.o loadelf.o disassemble.o helper.o interpret.o basicBlock.o compile.o region.o riscvInstruction.o regionCFG.o perfmap.o debugSymbols.o saveState.o simPoints.o githash.o state.o
 DEP = $(OBJ:.o=.d)
 
 .PHONY: all clean

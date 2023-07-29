@@ -14,7 +14,7 @@
 #include "execUnit.hh"
 #include "basicBlock.hh"
 #include "ssaInsn.hh"
-#include "mipsInstruction.hh"
+#include "riscvInstruction.hh"
 #include "llvmInc.hh"
 #include "perfmap.hh"
 #include "debugSymbols.hh"
@@ -86,21 +86,6 @@ class gprPhiNode : public phiNode {
   }
 };
 
-class hiloPhiNode : public phiNode {
-protected:
-  uint32_t hi;
-public:
-  hiloPhiNode(uint32_t hi) : phiNode(insnDefType::hilo), hi(hi){}
-  uint32_t destRegister() const override {
-    return hi;
-  }
-  void makeLLVMPhi(regionCFG *cfg, llvmRegTables& regTbl) override;
-  void addIncomingEdge(regionCFG *cfg, cfgBasicBlock *b) override;
-  void print() const override {
-    printf("phi for hi/lo \n");
-  }
-};
-
 class fprPhiNode : public phiNode {
  protected:
   uint32_t fprId;
@@ -164,13 +149,11 @@ public:
   llvm::Value *loadGPR(uint32_t gpr);
   llvm::Value *setGPR(uint32_t gpr, uint32_t x);
   llvm::Value *loadFPR(uint32_t fpr);
-  llvm::Value *loadHiLo(uint32_t h);
   llvm::Value *loadFCR(uint32_t fcr);
   llvm::Value *getFPR(uint32_t fpr, fprUseEnum useType=fprUseEnum::unused);
   void setFPR(uint32_t fpr, llvm::Value *v);
   void storeGPR(uint32_t gpr);
   void storeFPR(uint32_t fpr);
-  void storeHiLo(uint32_t h);
   void storeFCR(uint32_t fcr);
   void storeIcnt();
   llvm::Value *getIcnt() {
@@ -202,7 +185,6 @@ class cfgBasicBlock {
   std::array<phiNode*,32> gprPhis;
   std::array<phiNode*,32> fprPhis;
   std::array<phiNode*,5> fcrPhis;
-  std::array<phiNode*,2> hiLoPhis;
   std::array<phiNode*,1> icntPhis;
 
   std::map<llvm::BasicBlock*, llvm::BasicBlock*> jrMap;
@@ -217,7 +199,6 @@ class cfgBasicBlock {
 
   
   std::bitset<32> gprRead;
-  std::bitset<32> hiloRead;
   std::bitset<32> fprRead;
   std::bitset<5> fcrRead;
 
@@ -229,7 +210,6 @@ class cfgBasicBlock {
   
   llvm::BasicBlock *getSuccLLVMBasicBlock(uint32_t pc);
   void addPhiNode(gprPhiNode *phi);
-  void addPhiNode(hiloPhiNode *phi);
   void addPhiNode(fprPhiNode *phi);
   void addPhiNode(fcrPhiNode *phi);
   void addPhiNode(icntPhiNode *phi);
@@ -399,12 +379,10 @@ protected:
   llvm::Type *type_int32, *type_int64;
  
   std::set<cfgBasicBlock*> gprDefinitionBlocks[32];
-  std::set<cfgBasicBlock*> hiloDefinitionBlocks;
   std::set<cfgBasicBlock*> fprDefinitionBlocks[32];
   std::set<cfgBasicBlock*> fcrDefinitionBlocks[5];
 
   std::bitset<32> allGprRead;
-  std::bitset<1> allHiloRead;
   std::bitset<32> allFprRead;
   std::bitset<5> allFcrRead;
   std::vector<fprUseEnum> allFprTouched;

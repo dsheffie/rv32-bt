@@ -120,12 +120,6 @@ void basicBlock::setReadOnly() {
       hasjr |= is_jr(insn);
       hasjalr |= is_jalr(insn);
       hasjal |= is_jal(insn);
-      if(hasjal) {
-	uint32_t pc = entryAddr + i*4;
-	uint32_t jaddr = insn & ((1<<26)-1);
-	jaddr <<= 2;
-	jaddr |= ((pc+4) & (~((1<<28)-1)));
-      }
       hasmonitor |= is_monitor(insn);
     }
     if(cfgCplr) {

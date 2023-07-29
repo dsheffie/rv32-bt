@@ -241,7 +241,6 @@ void llvmRegTables::copy(const llvmRegTables &other) {
   iCnt = other.iCnt;
   fprTbl = other.fprTbl;
   gprTbl = other.gprTbl;
-  hiloTbl = other.hiloTbl;
   fcrTbl = other.fcrTbl;
 }
 
@@ -357,16 +356,7 @@ llvm::Value *llvmRegTables::loadFPR(uint32_t fpr) {
   return fprTbl[fpr];
 }
 
-llvm::Value *llvmRegTables::loadHiLo(uint32_t h) {
-  using namespace llvm;
-  if(hiloTbl[h]==nullptr) {
-    Value *vHiLoPtr=nullptr;
-    Value *vZero = ConstantInt::get(Type::getInt32Ty(*cfg->Context),0);
-    vHiLoPtr = myIRBuilder->CreateGEP(cfg->blockArgMap[h ? "hi" : "lo"], vZero);
-    hiloTbl[h] = myIRBuilder->CreateLoad(vHiLoPtr);
-  }
-  return hiloTbl[h];
-}
+
 llvm::Value *llvmRegTables::loadFCR(uint32_t fcr) {
   if(fcrTbl[fcr]!=nullptr)
     return fcrTbl[fcr];
@@ -425,13 +415,7 @@ void llvmRegTables::storeFPR(uint32_t fpr) {
   }
   myIRBuilder->CreateStore(fprTbl[fpr], gep);
 }
-void llvmRegTables::storeHiLo(uint32_t h) {
-  using namespace llvm;
-  Value *gep = nullptr;
-  Value *vZero = ConstantInt::get(Type::getInt32Ty(*cfg->Context),0);
-  gep = myIRBuilder->CreateGEP(cfg->blockArgMap[h ? "hi" : "lo"], vZero);
-  myIRBuilder->CreateStore(hiloTbl[h], gep);
-}
+
 void llvmRegTables::storeFCR(uint32_t fcr) {
   using namespace llvm;
   Value *offs = ConstantInt::get(Type::getInt32Ty(*(cfg->Context)),fcr);
@@ -443,11 +427,6 @@ void gprPhiNode::makeLLVMPhi(regionCFG *cfg, llvmRegTables& regTbl) {
   llvm::Type *iType32 = llvm::Type::getInt32Ty(*(cfg->Context));
   std::string phiName = getGPRName(gprId) + "_" + std::to_string(cfg->getuuid()++);
   regTbl.gprTbl[gprId] = lPhi = cfg->myIRBuilder->CreatePHI(iType32,0,phiName);
-}
-void hiloPhiNode::makeLLVMPhi(regionCFG *cfg, llvmRegTables& regTbl) {
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(*(cfg->Context));
-  std::string phiName = std::string(hi ? "hi" : "lo") + "_" + std::to_string(cfg->getuuid()++);
-  regTbl.hiloTbl[hi] = lPhi = cfg->myIRBuilder->CreatePHI(iType32,0,phiName);
 }
 
 void fprPhiNode::makeLLVMPhi(regionCFG *cfg, llvmRegTables& regTbl) {
@@ -487,7 +466,6 @@ void regionCFG::getRegDefBlocks() {
       ins->recUses(cbb);
     }
     /* Union bitvectors */
-    allHiloRead[0] = allHiloRead[0] | cbb->hiloRead[0];
     for(size_t i = 0; i < 32; i++)
       allGprRead[i] = allGprRead[i] | cbb->gprRead[i];
     for(size_t i = 0; i < 32; i++)
@@ -868,7 +846,6 @@ bool regionCFG::analyzeGraph() {
   bool usesFCR = false, usesFPR = false;
   for(size_t i = 0; i < 32; i++)
     cnt = allGprRead[i] ? cnt + 1 : cnt;
-  cnt = allHiloRead[0] ? cnt + 1 : cnt;
 
   for(size_t i = 0; i < 32; i++) {
     cnt = allFprRead[i] ? cnt + 1 : cnt;
@@ -1051,8 +1028,6 @@ void regionCFG::insertPhis()  {
     if(!gprDefinitionBlocks[gpr].empty())
       gprDefinitionBlocks[gpr].insert(entryBlock);
   }
-  if(!hiloDefinitionBlocks.empty())
-    hiloDefinitionBlocks.insert(entryBlock);
   for(size_t fpr = 0; fpr < 32; fpr++) {
     if(!fprDefinitionBlocks[fpr].empty())
       fprDefinitionBlocks[fpr].insert(entryBlock);
@@ -1065,10 +1040,7 @@ void regionCFG::insertPhis()  {
   for(size_t gpr = 1; gpr < 32; gpr++) {
     inducePhis<gprPhiNode>(gprDefinitionBlocks[gpr], gpr);
   }
-  /* handle lo-hi registers */
-  for(size_t hl = 0; hl < 2; hl++) {
-    inducePhis<hiloPhiNode>(hiloDefinitionBlocks, hl);
-  }
+
   /* handle fprs */
   for(size_t fpr = 0; fpr < 32; fpr+=2)  {
     if(allFprTouched[fpr] == fprUseEnum::both) {
@@ -1279,17 +1251,7 @@ void gprPhiNode::addIncomingEdge(regionCFG *cfg, cfgBasicBlock *b) {
   }
   lPhi->addIncoming(v,getLLVMParentBlock(b));
 }
-void hiloPhiNode::addIncomingEdge(regionCFG *cfg, cfgBasicBlock *b) {
-  llvm::Value *vHiLo = b->termRegTbl.hiloTbl[hi];
-  if(!vHiLo) {
-    printf("missing value for %s!\n", hi ? "hi" : "lo");
-    die();
-  }
-  if(!lPhi) {
-    die();
-  }
-  lPhi->addIncoming(vHiLo,getLLVMParentBlock(b));
-}
+
 void fprPhiNode::addIncomingEdge(regionCFG *cfg, cfgBasicBlock *b) {
   dbt_assert(b); 
 
@@ -1456,10 +1418,6 @@ llvm::BasicBlock* regionCFG::generateAbortBasicBlock(llvm::Value *abortpc,
       regTbl.storeGPR(i);
   }
   
-  if(!hiloDefinitionBlocks.empty()) {
-    regTbl.storeHiLo(0);
-    regTbl.storeHiLo(1);
-  }
 
   for(size_t i = 0; i < 32; i++) {
     if(!fprDefinitionBlocks[i].empty())

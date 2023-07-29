@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include "disassemble.hh"
-#include "mipsInstruction.hh"
+#include "riscvInstruction.hh"
 #include "regionCFG.hh"
 #include "helper.hh"
 #include "globals.hh"
@@ -11,20 +11,6 @@
 using namespace mips;
 
 typedef llvm::Value lv_t;
-
-static Insn* getRType(uint32_t inst, uint32_t addr);
-static Insn* getSpecial2(uint32_t inst, uint32_t addr);
-static Insn* getSpecial3(uint32_t inst, uint32_t addr);
-static Insn* getJType(uint32_t inst, uint32_t addr) {
-  uint32_t opcode = inst>>26;
-  if(opcode==0x2)
-    return new insn_j(inst, addr);
-  else if(opcode==0x3)
-    return new insn_jal(inst, addr);
-  return nullptr;
-}
-static Insn* getCoproc0(uint32_t inst, uint32_t addr);
-static Insn* getCoproc1(uint32_t inst, uint32_t addr);
 
 #define TC ((fmt==FMT_D?fprUseEnum::doublePrec : fprUseEnum::singlePrec))
 
@@ -372,61 +358,7 @@ public:
   void recUses(cfgBasicBlock *cBB) override {}
 };
 
-class insn_mfhi : public rTypeInsn {
-public:
-  insn_mfhi(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recUses(cfgBasicBlock *cBB) override;
-};
 
-class insn_mthi : public rTypeInsn {
-public:
-  insn_mthi(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
-};
-
-class insn_mflo : public rTypeInsn {
- public:
-  insn_mflo(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recUses(cfgBasicBlock *cBB) override;
-};
-
-class insn_mtlo : public rTypeInsn {
-public:
-  insn_mtlo(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
-};
-
-class insn_mult : public rTypeInsn {
-public:
-  insn_mult(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
-};
-
-class insn_multu : public rTypeInsn {
-public:
-  insn_multu(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
-};
-
-class insn_div : public rTypeInsn {
- public:
-  insn_div(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
-};
-
-class insn_divu : public rTypeInsn {
-public:
-  insn_divu(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
-};
 
 class insn_add : public rTypeInsn {
 public:
@@ -608,33 +540,6 @@ class insn_lui : public simpleIType {
  void updateGPRConstants(std::vector<regState> &gprConstState) override;
 };
 
-class insn_beql : public iBranchLikelyTypeInsn {
- public:
- insn_beql(uint32_t inst, uint32_t addr) : iBranchLikelyTypeInsn(inst, addr) {isLikely=true;}
- bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- 
-};
-
-class insn_bnel : public iBranchLikelyTypeInsn {
- public:
- insn_bnel(uint32_t inst, uint32_t addr) : iBranchLikelyTypeInsn(inst, addr) {isLikely=true;}
- bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- 
-};
-
-class insn_blezl : public iBranchLikelyTypeInsn {
- public:
- insn_blezl(uint32_t inst, uint32_t addr) : iBranchLikelyTypeInsn(inst, addr) {isLikely=true;}
- bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- 
-};
-
-class insn_bgtzl : public iBranchLikelyTypeInsn {
- public:
- insn_bgtzl(uint32_t inst, uint32_t addr) : iBranchLikelyTypeInsn(inst, addr) {isLikely=true;}
- bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- 
-};
 
 class insn_lb : public iTypeLoadInsn {
  public:
@@ -648,14 +553,6 @@ class insn_lh : public iTypeLoadInsn {
  insn_lh(uint32_t inst, uint32_t addr) : iTypeLoadInsn(inst, addr) {}
  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
  
-};
-
-class insn_lwl : public iTypeLoadInsn {
- public:
- insn_lwl(uint32_t inst, uint32_t addr) : iTypeLoadInsn(inst, addr) {}
- 
- bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- void recUses(cfgBasicBlock *cBB) override;
 };
 
 class insn_lw : public iTypeLoadInsn {
@@ -679,13 +576,6 @@ class insn_lhu : public iTypeLoadInsn {
  
 };
 
-class insn_lwr : public iTypeLoadInsn {
- public:
- insn_lwr(uint32_t inst, uint32_t addr) : iTypeLoadInsn(inst, addr) {}
- 
- bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- void recUses(cfgBasicBlock *cBB) override;
-};
 
 class insn_sb : public iTypeStoreInsn {
  public:
@@ -698,20 +588,6 @@ class insn_sh : public iTypeStoreInsn {
  public:
  insn_sh(uint32_t inst, uint32_t addr) : iTypeStoreInsn(inst, addr) {}
  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- 
-};
-
-class insn_swl : public iTypeStoreInsn {
- public:
- bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- insn_swl(uint32_t inst, uint32_t addr) : iTypeStoreInsn(inst, addr) {}
- 
-};
-
-class insn_swr : public iTypeStoreInsn {
- public:
- bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- insn_swr(uint32_t inst, uint32_t addr) : iTypeStoreInsn(inst, addr) {}
  
 };
 
@@ -845,59 +721,6 @@ protected:
  }
 };
 
-
-class fpLikelyBranchInsn : public fpBranchInsn {
-protected:
- enum class brCond {br_true, br_false, br_unknown};
- brCond brType;
-public:
- fpLikelyBranchInsn(uint32_t inst, uint32_t addr) :
-  fpBranchInsn(inst,addr), brType(brCond::br_unknown) {
-
- }
- bool isLikelyBranch() const override {
-   return true;
- }
- bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
- bool canCompile() const override;
-};
-
-class insn_bc1x : public fpBranchInsn {
-protected:
-  int32_t brType;
-public:
-  insn_bc1x(uint32_t inst, uint32_t addr) : fpBranchInsn(inst, addr), brType(-1) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  bool canCompile() const override;
-};
-
-class insn_bc1f : public insn_bc1x {
-public:
-  insn_bc1f(uint32_t inst, uint32_t addr) : insn_bc1x(inst, addr) {
-    brType = 0;
-  }
-};
-
-class insn_bc1t : public insn_bc1x {
-public:
-  insn_bc1t(uint32_t inst, uint32_t addr) : insn_bc1x(inst, addr) {
-    brType = 1;
-  } 
-};
-
-class insn_bc1fl : public fpLikelyBranchInsn {
-public:
- insn_bc1fl(uint32_t inst, uint32_t addr) : fpLikelyBranchInsn(inst, addr) {
-  brType = brCond::br_false;
- }
-};
-
-class insn_bc1tl : public fpLikelyBranchInsn {
-public:
- insn_bc1tl(uint32_t inst, uint32_t addr) : fpLikelyBranchInsn(inst, addr) {
-  brType = brCond::br_true;
- }
-};
 
 class insn_c : public coprocType1Insn {
 protected:
@@ -1124,10 +947,6 @@ bool fmsub::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) {
 #undef TTC
 }
 
-static Insn* getCoproc2(uint32_t inst, uint32_t addr) {
-  return nullptr;
-}
-static Insn* getIType(uint32_t inst, uint32_t addr);
 
 std::string Insn::getString() const {
   std::stringstream ss;
@@ -1257,12 +1076,7 @@ void rTypeInsn::updateGPRConstants(std::vector<regState> &gprConstState) {
   }
 }
 
-void insn_div::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cfg->hiloDefinitionBlocks.insert(cBB);
-}
-void insn_divu::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cfg->hiloDefinitionBlocks.insert(cBB);
-}
+
 void insn_jalr::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
   cfg->gprDefinitionBlocks[R_ra].insert(cBB);
 }
@@ -1271,39 +1085,6 @@ void insn_jalr::recUses(cfgBasicBlock *cBB) {
 }
 void insn_jr::recUses(cfgBasicBlock *cBB) {
   cBB->gprRead[rs]=true;
-}
-void insn_mthi::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cfg->hiloDefinitionBlocks.insert(cBB);
-}
-bool insn_mthi::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
-  regTbl.hiloTbl[1] = regTbl.gprTbl[rs];
-  return false;
-}
-void insn_mtlo::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cfg->hiloDefinitionBlocks.insert(cBB);
-}
-bool insn_mtlo::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
-  regTbl.hiloTbl[0] = regTbl.gprTbl[rs];
-  return false;
-}
-void insn_mflo::recUses(cfgBasicBlock *cBB) {
-  cBB->hiloRead[0] = true;
-}
-bool insn_mflo::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
-   regTbl.gprTbl[rd] = regTbl.hiloTbl[0];
-   return false;
-}
-
-void insn_mfhi::recUses(cfgBasicBlock *cBB) {
-  cBB->hiloRead[1] = true;
-}
-bool insn_mfhi::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
-   regTbl.gprTbl[rd] = regTbl.hiloTbl[1];
-   return false;
-}
-
-void insn_mult::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cfg->hiloDefinitionBlocks.insert(cBB);
 }
 
 coprocType1Insn::coprocType1Insn(uint32_t inst, uint32_t addr) : 
@@ -1420,107 +1201,7 @@ bool iBranchLikelyTypeInsn::handleBranch(cfgBasicBlock *cBB, Insn* nInst, llvmRe
 }
 
 
-bool fpLikelyBranchInsn::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
-  llvm::Value *vZ = llvm::ConstantInt::get(cfg->type_int32,0);
-  llvm::Value *vCode = getConditionCode(cfg,regTbl, cc);
-  llvm::Value *vCMP = nullptr;
-  std::string brName = "bc1xl_" + toStringHex(addr);
-  cfgBasicBlock *patchBB = nullptr;
-  switch(brType)
-    {
-    case brCond::br_false:
-      vCMP = cfg->myIRBuilder->CreateICmpEQ(vCode, vZ, brName);
-      break;
-    case brCond::br_true:
-      vCMP = cfg->myIRBuilder->CreateICmpNE(vCode, vZ, brName);
-      break;
-    default:
-      die();
-    }
 
-  
-  for(cfgBasicBlock* b : cBB->succs) {
-    if(b->isLikelyPatch) {
-      patchBB = b;
-      break;
-    }
-  }
-  assert(patchBB);
-
-  llvm::BasicBlock *tBB = patchBB->lBB;
-  llvm::BasicBlock *ntBB = cBB->getSuccLLVMBasicBlock(ntAddr);
-
-  ntBB = cfg->generateAbortBasicBlock(ntAddr, regTbl, cBB, ntBB, addr);
-  cfg->myIRBuilder->CreateCondBr(vCMP, tBB, ntBB);
-  
-  cBB->hasTermBranchOrJump = true;
-
-  return false;
-}
-
-
-bool insn_mult::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType64 = llvm::Type::getInt64Ty(cxt);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vZRS = cfg->myIRBuilder->CreateSExt(regTbl.gprTbl[rs], iType64);
-  llvm::Value *vZRT = cfg->myIRBuilder->CreateSExt(regTbl.gprTbl[rt], iType64);
-  llvm::Value *vMul = cfg->myIRBuilder->CreateMul(vZRS,vZRT);
-  llvm::Value *v32 = llvm::ConstantInt::get(iType64,32);
-  llvm::Value *vShft = cfg->myIRBuilder->CreateAShr(vMul, v32);
-  regTbl.hiloTbl[1] = cfg->myIRBuilder->CreateTrunc(vShft, iType32);
-  regTbl.hiloTbl[0] = cfg->myIRBuilder->CreateTrunc(vMul, iType32);
-
-  
-
-  return false;
-}
-
-void insn_multu::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cfg->hiloDefinitionBlocks.insert(cBB);
-}
-
-bool insn_multu::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType64 = llvm::Type::getInt64Ty(cxt);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vZRS = cfg->myIRBuilder->CreateZExt(regTbl.gprTbl[rs], iType64);
-  llvm::Value *vZRT = cfg->myIRBuilder->CreateZExt(regTbl.gprTbl[rt], iType64);
-  llvm::Value *vMul = cfg->myIRBuilder->CreateMul(vZRS,vZRT);
-  llvm::Value *v32 = llvm::ConstantInt::get(iType64,32);
-  llvm::Value *vShft = cfg->myIRBuilder->CreateLShr(vMul, v32);
-  regTbl.hiloTbl[1] = cfg->myIRBuilder->CreateTrunc(vShft, iType32);
-  regTbl.hiloTbl[0] = cfg->myIRBuilder->CreateTrunc(vMul, iType32);
-
-
-  return false;
-}
-
-bool insn_div::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vOne = llvm::ConstantInt::get(iType32,1);
-  llvm::Value *vZero = llvm::ConstantInt::get(iType32,0);
-  llvm::Value *vCmp = cfg->myIRBuilder->CreateICmpEQ(regTbl.gprTbl[rt], vZero);
-  llvm::Value *vDivider = cfg->myIRBuilder->CreateSelect(vCmp, vOne, regTbl.gprTbl[rt]);
-
-  regTbl.hiloTbl[0] = cfg->myIRBuilder->CreateSDiv(regTbl.gprTbl[rs], vDivider);
-  regTbl.hiloTbl[1] = cfg->myIRBuilder->CreateSRem(regTbl.gprTbl[rs], vDivider);
-
-  return false;
-}
-
-bool insn_divu::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vOne = llvm::ConstantInt::get(iType32,1);
-  llvm::Value *vZero = llvm::ConstantInt::get(iType32,0);
-  llvm::Value *vCmp = cfg->myIRBuilder->CreateICmpEQ(regTbl.gprTbl[rt], vZero);
-  llvm::Value *vDivider = cfg->myIRBuilder->CreateSelect(vCmp, vOne, regTbl.gprTbl[rt]);
-  regTbl.hiloTbl[0] = cfg->myIRBuilder->CreateUDiv(regTbl.gprTbl[rs], vDivider);
-  regTbl.hiloTbl[1] = cfg->myIRBuilder->CreateURem(regTbl.gprTbl[rs], vDivider);
-  return false;
-}
 
 void iTypeInsn::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
   //printf("iTYPE : %s defines %s\n", getAsmString(inst,addr).c_str(), 
@@ -1717,85 +1398,7 @@ bool insn_clz::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl
   return false;
 }
 
-void insn_madd::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cfg->hiloDefinitionBlocks.insert(cBB);
-}
-void insn_madd::recUses(cfgBasicBlock *cBB) {
-  cBB->gprRead[rs] = cBB->gprRead[rt] = true;
-  cBB->hiloRead[0] = cBB->hiloRead[1] = true;
-}
 
-bool insn_madd::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType64 = llvm::Type::getInt64Ty(cxt);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vShftAmt = llvm::ConstantInt::get(iType64,32);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vZRS = cfg->myIRBuilder->CreateSExt(vRS, iType64);
-  llvm::Value *vZRT = cfg->myIRBuilder->CreateSExt(vRT, iType64);
-  llvm::Value *vMul = cfg->myIRBuilder->CreateMul(vZRS,vZRT);
-  llvm::Value *vZLo = cfg->myIRBuilder->CreateSExt( regTbl.hiloTbl[0], iType64);
-  llvm::Value *vZHi = cfg->myIRBuilder->CreateSExt( regTbl.hiloTbl[1], iType64);
-  llvm::Value *vZHiShft = cfg->myIRBuilder->CreateShl(vZHi, vShftAmt);
-  llvm::Value *vPrev = cfg->myIRBuilder->CreateOr(vZHiShft,vZLo);
-  llvm::Value *vY = cfg->myIRBuilder->CreateAdd(vMul, vPrev);
-  llvm::Value *vLo = cfg->myIRBuilder->CreateTrunc(vY, iType32);
-  llvm::Value *vHiShft = cfg->myIRBuilder->CreateLShr(vY, vShftAmt);
-  llvm::Value *vHi =  cfg->myIRBuilder->CreateTrunc(vHiShft, iType32);
-  regTbl.hiloTbl[0] = vLo;
-  regTbl.hiloTbl[1] = vHi;
-
-
-
-  return false;
-}
-
-void insn_msub::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cfg->hiloDefinitionBlocks.insert(cBB);
-}
-void insn_msub::recUses(cfgBasicBlock *cBB) {
-  cBB->gprRead[rs] = cBB->gprRead[rt] = true;
-  cBB->hiloRead[0] = cBB->hiloRead[1] = true;
-}
-
-bool insn_msub::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType64 = llvm::Type::getInt64Ty(cxt);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vShftAmt = llvm::ConstantInt::get(iType64,32);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vZRS = cfg->myIRBuilder->CreateSExt(vRS, iType64);
-  llvm::Value *vZRT = cfg->myIRBuilder->CreateSExt(vRT, iType64);
-  llvm::Value *vMul = cfg->myIRBuilder->CreateMul(vZRS,vZRT);
-  llvm::Value *vZLo = cfg->myIRBuilder->CreateSExt( regTbl.hiloTbl[0], iType64);
-  llvm::Value *vZHi = cfg->myIRBuilder->CreateSExt( regTbl.hiloTbl[1], iType64);
-  llvm::Value *vZHiShft = cfg->myIRBuilder->CreateShl(vZHi, vShftAmt);
-  llvm::Value *vPrev = cfg->myIRBuilder->CreateOr(vZHiShft,vZLo);
-  llvm::Value *vY = cfg->myIRBuilder->CreateSub(vPrev,vMul);
-  llvm::Value *vLo = cfg->myIRBuilder->CreateTrunc(vY, iType32);
-  llvm::Value *vHiShft = cfg->myIRBuilder->CreateLShr(vY, vShftAmt);
-  llvm::Value *vHi =  cfg->myIRBuilder->CreateTrunc(vHiShft, iType32);
-  regTbl.hiloTbl[0] = vLo;
-  regTbl.hiloTbl[1] = vHi;
-
-  return false;
-}
-
-void insn_maddu::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cfg->hiloDefinitionBlocks.insert(cBB);
-}
-void insn_maddu::recUses(cfgBasicBlock *cBB) {
-  cBB->gprRead[rs] = cBB->gprRead[rt] = true;
-  cBB->hiloRead[0] = cBB->hiloRead[1] = true;
-}
-
-bool insn_maddu::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) {
-  printf("%s unimplemented\n", __PRETTY_FUNCTION__);
-  exit(-1);
-  return false;
-}
 
 void insn_ext::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
   cfg->gprDefinitionBlocks[rt].insert(cBB);
@@ -1827,20 +1430,6 @@ bool insn_ext::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl
   return false;
 }
 
-bool insn_ins::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt); 
-  llvm::Value *vMask = llvm::ConstantInt::get(iType32, mask);
-  llvm::Value *vLSB = llvm::ConstantInt::get(iType32, lsb);
-  llvm::Value *v = cfg->myIRBuilder->CreateAnd(regTbl.gprTbl[rs], vMask);
-  v = cfg->myIRBuilder->CreateShl(v, vLSB);
-
-  llvm::Value *vCmask = llvm::ConstantInt::get(iType32, cmask);
-  llvm::Value *c = cfg->myIRBuilder->CreateAnd(regTbl.gprTbl[rt], vCmask);
-  regTbl.gprTbl[rt] = cfg->myIRBuilder->CreateOr(c, v);
-  
-  return false;
-}
 
 void insn_seh::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
   cfg->gprDefinitionBlocks[rd].insert(cBB);
@@ -1860,10 +1449,6 @@ void insn_ext::recUses(cfgBasicBlock *cBB) {
   cBB->gprRead[rs]=true;
 }
 
-void insn_ins::recUses(cfgBasicBlock *cBB) {
-  cBB->gprRead[rs]=true;
-  cBB->gprRead[rt]=true;
-}
 
 void insn_seb::recUses(cfgBasicBlock *cBB) {
   cBB->gprRead[rt]=true;
@@ -1882,392 +1467,10 @@ bool insn_seh::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl
 }
 
 Insn* getInsn(uint32_t inst, uint32_t addr){
-  uint32_t opcode = inst>>26;
-  bool isRType = (opcode==0);
-  bool isJType = ((opcode>>1)==1);
-  bool isCoproc0 = (opcode == 0x10);
-  bool isCoproc1 = (opcode == 0x11);
-  bool isCoproc1x = (opcode == 0x13);
-  bool isCoproc2 = (opcode == 0x12);
-  bool isSpecial2 = (opcode == 0x1c); 
-  bool isSpecial3 = (opcode == 0x1f);
-  bool isLoadLinked = (opcode == 0x30);
-  bool isStoreCond = (opcode == 0x38);
-  Insn *ins = nullptr;
-
-  if(isRType)
-    ins =  getRType(inst, addr);
-  else if(isSpecial2)
-    ins =  getSpecial2(inst, addr);
-  else if(isSpecial3)
-    ins =  getSpecial3(inst, addr);
-  else if(isJType)
-    ins =  getJType(inst, addr);
-  else if(isCoproc0)
-    ins =  getCoproc0(inst, addr);
-  else if(isCoproc1)
-    ins =  getCoproc1(inst, addr);
-  else if(isCoproc1x)
-    ins =  getCoproc1x(inst, addr);
-  else if(isCoproc2)
-    ins =  getCoproc2(inst, addr);
-  else if(isLoadLinked)
-    ins =  nullptr;
-  else if(isStoreCond)
-    ins = nullptr;
-  else 
-    ins =  getIType(inst, addr);
-
-  if(ins == nullptr) {
-    printf("returning nullptr for %x:%s!\n",addr,getAsmString(inst,addr).c_str());
-    
-    exit(-1);
-  }
-  return ins;
-}
-
-static Insn* getRType(uint32_t inst, uint32_t addr)
-{
-  uint32_t funct = inst & 63;
-  switch(funct)
-    {
-    case 0x00:
-      return new insn_sll(inst, addr);
-      break;
-    case 0x01:
-      return new insn_movci(inst, addr);
-      break;
-    case 0x02:
-      return new insn_srl(inst, addr);
-      break;
-    case 0x03:
-      return new insn_sra(inst, addr);
-      break;
-    case 0x04:
-      return new insn_sllv(inst, addr);
-      break;
-    case 0x05:
-      return new insn_monitor(inst, addr);
-      break;
-    case 0x06:
-      return new insn_srlv(inst, addr);
-      break;
-    case 0x07:
-      return new insn_srav(inst, addr);
-      break;
-    case 0x08:
-      return new insn_jr(inst, addr);
-      break;
-    case 0x09:
-      return new insn_jalr(inst, addr);
-      break;
-    case 0x0B:
-      return new insn_movn(inst, addr);
-      break;
-    case 0x0A:
-      return new insn_movz(inst, addr);
-      break;
-    case 0x0C: 
-      return new insn_syscall(inst, addr);
-      break;
-    case 0x0f:
-      return new insn_sync(inst, addr);
-      break;
-    case 0x0D:
-      return new insn_break(inst, addr);
-      break;
-    case 0x10:
-      return new insn_mfhi(inst, addr);
-      break;
-    case 0x11:
-      return new insn_mthi(inst, addr);
-      break;
-    case 0x12:
-      return new insn_mflo(inst, addr);
-      break;
-    case 0x13:
-      return new insn_mtlo(inst, addr);
-      break;
-    case 0x18:
-      return new insn_mult(inst, addr);
-      break;
-    case 0x19:
-      return new insn_multu(inst, addr);
-      break;
-    case 0x1A:
-      return new insn_div(inst, addr);
-      break;
-    case 0x1B:
-      return new insn_divu(inst, addr);
-      break;
-    case 0x20: 
-      return new insn_add(inst, addr);
-      break;
-    case 0x21:
-      return new insn_addu(inst, addr);
-      break;
-    case 0x22:
-      return new insn_sub(inst, addr);
-      break;
-    case 0x23:
-      return new insn_subu(inst, addr);
-      break;
-    case 0x24:
-      return new insn_and(inst, addr);
-      break;
-    case 0x25: 
-      return new insn_or(inst, addr);
-      break;
-    case 0x26:
-      return new insn_xor(inst, addr);
-      break;
-    case 0x27:
-      return new insn_nor(inst, addr);
-      break;
-    case 0x2A: 
-      return new insn_slt(inst, addr);
-      break;
-    case 0x2B:
-      return new insn_sltu(inst, addr);
-      break;
-    case 0x30: 
-      return new insn_tge(inst, addr);
-      break;
-    case 0x34:
-      return new insn_teq(inst, addr);
-      break;
-    default:
-      printf("unhandled RType instruction\n");
-      return nullptr;
-      break;
-    }
   return nullptr;
 }
 
 
-static Insn* getSpecial2(uint32_t inst, uint32_t addr)
-{
-  uint32_t funct = inst & 63;
-  switch(funct)
-    {
-    case(0x0):
-      return new insn_madd(inst,addr);
-    case(0x1):
-      return new insn_maddu(inst,addr);
-    case(0x2):
-      return new insn_mul(inst,addr);
-    case 0x4:
-      return new insn_msub(inst,addr);
-    case(0x20):
-      return new insn_clz(inst,addr);
-    }
-  return nullptr;
-}
-static Insn* getSpecial3(uint32_t inst, uint32_t addr)
-{
-  uint32_t funct = inst & 63;
-  uint32_t op = (inst>>6) & 31;
-  if(funct == 32) {
-    switch(op) {
-    case 0x10:
-      return new insn_seb(inst, addr);
-      break;
-    case 0x18:
-      return new insn_seh(inst, addr);
-      break;
-    }
-  }
-  else if(funct == 0)
-    return new insn_ext(inst, addr);
-  else if(funct == 4) 
-    return new insn_ins(inst, addr);
-  else
-    return nullptr;
-  /* needed to make clang happy */
-  return nullptr;
-}
-static Insn* getCoproc0(uint32_t inst, uint32_t addr)
-{
-  uint32_t functField = (inst>>21) & 31;
-  switch(functField) {
-  case 0x0:
-    return new insn_mfc0(inst, addr);
-    break;
-  case 0x4:
-    return new insn_mtc0(inst, addr);
-    break;
-  }
-  return nullptr;
-}
-
-static Insn* getCoproc1(uint32_t inst, uint32_t addr)
-{
-  uint32_t opcode = inst>>26;
-  uint32_t functField = (inst>>21) & 31;
-  uint32_t lowop = inst & 63;  
-  uint32_t fmt = (inst >> 21) & 31;
-
-  uint32_t nd_tf = (inst>>16) & 3;
-  
-  uint32_t lowbits = inst & ((1<<11)-1);
-  opcode &= 0x3;
-  if(fmt == 0x8)
-    {
-      switch(nd_tf)
-	{
-	case 0x0:
-	  return new insn_bc1f(inst, addr);
-	  break;
-	case 0x1:
-	  return new insn_bc1t(inst, addr);
-	  break;
-	case 0x2:
-	  return new insn_bc1fl(inst, addr);
-	  break;
-	case 0x3:
-	  return new insn_bc1tl(inst, addr);
-	  break;
-	}
-    }
-  else if((lowbits == 0) && ((functField==0x0) || (functField==0x4)))
-    {
-      if(functField == 0x0)
-	return new insn_mfc1(inst,addr);
-      else if(functField == 0x4)
-	return new insn_mtc1(inst,addr);
-    }
-  else
-    {
-      if((lowop >> 4) == 3)
-	return new insn_c(inst, addr);
-      else {
-	switch(lowop) {
-	case 0x0:
-	  return new insn_fadd(inst, addr);
-	case 0x1:
-	  return new insn_fsub(inst, addr);
-	case 0x2:
-	  return new insn_fmul(inst, addr);
-	case 0x3:
-	  return new insn_fdiv(inst, addr);
-	case 0x4:
-	  return new insn_fsqrt(inst, addr);
-	case 0x6:
-	  return new insn_fmov(inst,addr);
-	case 0xd:
-	  return new insn_truncw(inst, addr);
-	case 0x11:
-	  return new insn_fmovc(inst, addr);
-	case 0x12:
-	  return new insn_fmovz(inst, addr);
-	case 0x13:
-	  return new insn_fmovn(inst, addr);
-	case 0x20:
-	  return new insn_cvts(inst, addr);
-	case 0x21:
-	  return new insn_cvtd(inst, addr);
-	default:
-	  printf("line %d : lowop = %x\n", __LINE__, lowop);
-	  exit(-1);
-	  break;
-	}
-      }
-    }
-  return nullptr;
-}
-static Insn* getIType(uint32_t inst, uint32_t addr)
-{
-  uint32_t opcode = inst>>26;
-  switch(opcode)
-    {
-    case 0x01: {
-      uint32_t rt = (inst >> 16) & 31;
-      Insn *br = 0;
-      switch(rt) 
-	{
-	case 0:
-	  br = new insn_bltz(inst, addr);
-	  break;
-	case 1:
-	  br = new insn_bgez(inst, addr);
-	  break;
-	case 2:
-	  br = new insn_bltzl(inst, addr);
-	  break;
-	case 3:
-	  br = new insn_bgezl(inst, addr);
-	  break;
-	}
-      return br;
-      break;
-    }
-    case 0x04: 
-      return new insn_beq(inst,addr); 
-    case 0x05: 
-      return new insn_bne(inst,addr); 
-    case 0x06: 
-      return new insn_blez(inst,addr); 
-    case 0x07: 
-      return new insn_bgtz(inst,addr);
-    case 0x08:  
-      return new insn_addi(inst,addr); 
-    case 0x09: 
-      return new insn_addiu(inst,addr); 
-    case 0x0a: 
-      return new insn_slti(inst,addr); 
-    case 0x0b: 
-      return new insn_sltiu(inst,addr); 
-    case 0x0c:
-      return new insn_andi(inst,addr); 
-    case 0x0d: 
-      return new insn_ori(inst,addr); 
-    case 0x0e: 
-      return new insn_xori(inst,addr);
-    case 0x0f:
-      return new insn_lui(inst,addr); 
-    case 0x14: 
-      return new insn_beql(inst, addr);
-    case 0x15: 
-      return new insn_bnel(inst,addr); 
-    case 0x16:
-      return new insn_blezl(inst, addr);
-    case 0x17:
-      return new insn_bgtzl(inst, addr);
-    case 0x20: 
-      return new insn_lb(inst,addr); 
-    case 0x21: 
-      return new insn_lh(inst,addr);
-    case 0x22:
-      return new insn_lwl(inst,addr);
-    case 0x23: 
-      return new insn_lw(inst,addr); 
-    case 0x24: 
-      return new insn_lbu(inst,addr);
-    case 0x25:
-      return new insn_lhu(inst,addr); 
-    case 0x26:
-      return new insn_lwr(inst, addr);
-    case 0x28: 
-      return new insn_sb(inst,addr); 
-    case 0x29:  
-      return new insn_sh(inst,addr); 
-    case 0x2a:
-      return new insn_swl(inst,addr);
-    case 0x2B: 
-      return new insn_sw(inst,addr); 
-    case 0x2e:
-      return new insn_swr(inst,addr);
-    case 0x31:
-      return new insn_lwc1(inst, addr);
-    case 0x35: 
-      return new insn_ldc1(inst,addr); 
-    case 0x39:
-      return new insn_swc1(inst, addr);
-    case 0x3d: 
-      return new insn_sdc1(inst,addr); 
-    }
-    return nullptr;
-}
 
 uint32_t simpleRType::doOp(uint32_t a, uint32_t b) {
   switch(r_type)
@@ -2478,102 +1681,6 @@ void insn_addiu::updateGPRConstants(std::vector<regState> &gprConstState) {
   }
 }
 
-bool insn_swl::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Type *iType64 = llvm::Type::getInt64Ty(cxt);
-  llvm::Type *iPtrType32 = llvm::Type::getInt32PtrTy(cxt);
-
-  llvm::Value *vIMM = llvm::ConstantInt::get(iType32,simm);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  llvm::Value *vEA = cfg->myIRBuilder->CreateAdd(vRS, vIMM);
-
-  llvm::Value *vMask0 = llvm::ConstantInt::get(iType32, 0xfffffffc);
-  llvm::Value *vMask1 = llvm::ConstantInt::get(iType32, 0x3);
-  llvm::Value *vMA = cfg->myIRBuilder->CreateAnd(vEA, vMask1);
-  vEA = cfg->myIRBuilder->CreateAnd(vEA, vMask0);
-  llvm::Value *vZEA = cfg->myIRBuilder->CreateZExt(vEA, iType64);
-  
-  llvm::Value *vMem = cfg->blockArgMap["mem"];
-  llvm::Value *vGEP = cfg->myIRBuilder->CreateGEP(vMem, vZEA);
-  llvm::Value *vPtr = cfg->myIRBuilder->CreateBitCast(vGEP, iPtrType32);
-  llvm::Value *vLoad = cfg->myIRBuilder->CreateLoad(vPtr);
-  llvm::Value *vR = byteSwap(vLoad);
-
- llvm::Value *vX = regTbl.gprTbl[rt];
-  
- llvm::Value *vOne = llvm::ConstantInt::get(iType32, 1);
- llvm::Value *vFour = llvm::ConstantInt::get(iType32, 4);
- llvm::Value *vEight = llvm::ConstantInt::get(iType32, 8);
-
- if(globals::isMipsEL) {
-   llvm::Value *vThree = llvm::ConstantInt::get(iType32, 3);
-   vMA = cfg->myIRBuilder->CreateSub(vThree, vMA);
- }
-  
-  llvm::Value *vShftAmt = cfg->myIRBuilder->CreateMul(vEight, vMA);
-  llvm::Value *vXS = cfg->myIRBuilder->CreateLShr(vX, vShftAmt);
-  llvm::Value *v0 = cfg->myIRBuilder->CreateSub(vFour, vMA);
-  llvm::Value *v1 = cfg->myIRBuilder->CreateMul(vEight, v0);
-  llvm::Value *v2 = cfg->myIRBuilder->CreateShl(vOne, v1);
-  llvm::Value *v3 = cfg->myIRBuilder->CreateSub(v2, vOne);
-  llvm::Value *v4 = cfg->myIRBuilder->CreateNot(v3);
-  llvm::Value *vRR = cfg->myIRBuilder->CreateAnd(vR, v4);
-  llvm::Value *vXX = cfg->myIRBuilder->CreateOr(vXS, vRR);
-
-  cfg->myIRBuilder->CreateStore(byteSwap(vXX), vPtr);
-
-  return false;
-}
-
-bool insn_swr::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Type *iType64 = llvm::Type::getInt64Ty(cxt);
-  llvm::Type *iPtrType32 = llvm::Type::getInt32PtrTy(cxt);
-
-  llvm::Value *vIMM = llvm::ConstantInt::get(iType32,simm);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  llvm::Value *vEA = cfg->myIRBuilder->CreateAdd(vRS, vIMM);
-
-  llvm::Value *vMask0 = llvm::ConstantInt::get(iType32, 0xfffffffc);
-  llvm::Value *vMask1 = llvm::ConstantInt::get(iType32, 0x3);
-  llvm::Value *vMA = cfg->myIRBuilder->CreateAnd(vEA, vMask1);
-  vEA = cfg->myIRBuilder->CreateAnd(vEA, vMask0);
-  llvm::Value *vZEA = cfg->myIRBuilder->CreateZExt(vEA, iType64);
-  
-  llvm::Value *vMem = cfg->blockArgMap["mem"];
-  llvm::Value *vGEP = cfg->myIRBuilder->CreateGEP(vMem, vZEA);
-  llvm::Value *vPtr = cfg->myIRBuilder->CreateBitCast(vGEP, iPtrType32);
-  llvm::Value *vLoad = cfg->myIRBuilder->CreateLoad(vPtr);
-  llvm::Value *vR = byteSwap(vLoad);
-
- llvm::Value *vX = regTbl.gprTbl[rt];
-  
- llvm::Value *vOne = llvm::ConstantInt::get(iType32, 1);
- llvm::Value *vThree = llvm::ConstantInt::get(iType32, 3);
- llvm::Value *vEight = llvm::ConstantInt::get(iType32, 8);
- 
- if(globals::isMipsEL) {
-   vMA = cfg->myIRBuilder->CreateSub(vThree, vMA);
- }
- llvm::Value *v0 = cfg->myIRBuilder->CreateSub(vThree, vMA);
- llvm::Value *v1 = cfg->myIRBuilder->CreateMul(vEight, v0);
- 
- /* r mask generation */
- llvm::Value *v2 = cfg->myIRBuilder->CreateShl(vOne, v1);
- llvm::Value *vRMask = cfg->myIRBuilder->CreateSub(v2, vOne);
- llvm::Value *vRR = cfg->myIRBuilder->CreateAnd(vR, vRMask);
- 
- /* x mask */
- llvm::Value *v7 = cfg->myIRBuilder->CreateShl(vX, v1);
- llvm::Value *vXX = cfg->myIRBuilder->CreateOr(vRR, v7);
- 
- cfg->myIRBuilder->CreateStore(byteSwap(vXX), vPtr);
- 
- return false;
-}
-
 bool insn_sb::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
   llvm::Value *vIMM = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*(cfg->Context)),simm);
   llvm::Value *vRS = regTbl.gprTbl[rs];
@@ -2701,114 +1808,6 @@ bool insn_lw::generateIR(cfgBasicBlock *cBB, Insn *nInst,llvmRegTables& regTbl) 
   return false;
 }
 
-void insn_lwl::recUses(cfgBasicBlock *cBB) {
-    cBB->gprRead[rs]=true;
-    cBB->gprRead[rt]=true;
-}
-void insn_lwr::recUses(cfgBasicBlock *cBB) {
-    cBB->gprRead[rs]=true;
-    cBB->gprRead[rt]=true;
-}
-
-
-bool insn_lwl::generateIR(cfgBasicBlock *cBB, Insn *nInst,llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Type *iType64 = llvm::Type::getInt64Ty(cxt);
-  llvm::Type *iPtrType32 = llvm::Type::getInt32PtrTy(cxt);
-
-  llvm::Value *vIMM = llvm::ConstantInt::get(iType32,simm);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  llvm::Value *vEA = cfg->myIRBuilder->CreateAdd(vRS, vIMM);
-
-  llvm::Value *vMask0 = llvm::ConstantInt::get(iType32,0xfffffffc);
-  llvm::Value *vMask1 = llvm::ConstantInt::get(iType32,0x3);
-  llvm::Value *vOne =  llvm::ConstantInt::get(iType32,1);
-  llvm::Value *vFour = llvm::ConstantInt::get(iType32,4);
-  llvm::Value *vEight = llvm::ConstantInt::get(iType32,8);
-
-  llvm::Value *vMA = cfg->myIRBuilder->CreateAnd(vEA, vMask1);
-  vEA = cfg->myIRBuilder->CreateAnd(vEA, vMask0);
-  llvm::Value *vZEA = cfg->myIRBuilder->CreateZExt(vEA, iType64);
-  llvm::Value *vMem = cfg->blockArgMap["mem"];
-  llvm::Value *vGEP = cfg->myIRBuilder->CreateGEP(vMem, vZEA);
-  llvm::Value *vPtr = cfg->myIRBuilder->CreateBitCast(vGEP, iPtrType32);
-  std::string loadName = "lwl_" + std::to_string(cfg->getuuid()++) + "_" + toStringHex(addr);
-  llvm::Value *vLoad = cfg->myIRBuilder->CreateLoad(vPtr,loadName);
-  llvm::Value *vR = byteSwap(vLoad);
-
-  if(globals::isMipsEL) {
-    llvm::Value *vThree = llvm::ConstantInt::get(iType32,3);
-    vMA = cfg->myIRBuilder->CreateSub(vThree, vMA);
-  }
-  
-  llvm::Value *vX = regTbl.gprTbl[rt];
-  llvm::Value *vShftAmt = cfg->myIRBuilder->CreateMul(vEight, vMA);
-  llvm::Value *vMaskDisp = cfg->myIRBuilder->CreateSub(vFour, vMA);
-  llvm::Value *vMulMask = cfg->myIRBuilder->CreateMul(vMaskDisp, vEight);
-  vMulMask =  cfg->myIRBuilder->CreateShl(vOne, vMulMask);
-  llvm::Value *vLoadMask = cfg->myIRBuilder->CreateSub(vMulMask, vOne);
-
-  llvm::Value *vRegMask = cfg->myIRBuilder->CreateShl(vOne, vShftAmt);
-  vRegMask = cfg->myIRBuilder->CreateSub(vRegMask, vOne);
-
-  llvm::Value *vRm = cfg->myIRBuilder->CreateAnd(vR, vLoadMask);
-  llvm::Value *vRs = cfg->myIRBuilder->CreateShl(vRm, vShftAmt);
-
-  llvm::Value *vXm = cfg->myIRBuilder->CreateAnd(vX, vRegMask);
-  
-  regTbl.gprTbl[rt] = cfg->myIRBuilder->CreateOr(vRs, vXm);
-  
-  return false;
-}
-
-bool insn_lwr::generateIR(cfgBasicBlock *cBB, Insn *nInst,llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Type *iType64 = llvm::Type::getInt64Ty(cxt);
-  llvm::Type *iPtrType32 = llvm::Type::getInt32PtrTy(cxt);
-
-  llvm::Value *vIMM = llvm::ConstantInt::get(iType32,simm);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  llvm::Value *vEA = cfg->myIRBuilder->CreateAdd(vRS, vIMM);
-
-  llvm::Value *vMask0 = llvm::ConstantInt::get(iType32,0xfffffffc);
-  llvm::Value *vMask1 = llvm::ConstantInt::get(iType32,0x3);
-  llvm::Value *vOne = llvm::ConstantInt::get(iType32,1);
-  llvm::Value *vThree = llvm::ConstantInt::get(iType32,3);
-  llvm::Value *vEight = llvm::ConstantInt::get(iType32,8);
-
-  llvm::Value *vMA = cfg->myIRBuilder->CreateAnd(vEA, vMask1);
-  vEA = cfg->myIRBuilder->CreateAnd(vEA, vMask0);
-  llvm::Value *vZEA = cfg->myIRBuilder->CreateZExt(vEA, iType64);
-  llvm::Value *vMem = cfg->blockArgMap["mem"];
-  llvm::Value *vGEP = cfg->myIRBuilder->CreateGEP(vMem, vZEA);
-  llvm::Value *vPtr = cfg->myIRBuilder->CreateBitCast(vGEP, iPtrType32);
-  std::string loadName = "lwl_" + std::to_string(cfg->getuuid()++) + "_" + toStringHex(addr);
-  llvm::Value *vLoad = cfg->myIRBuilder->CreateLoad(vPtr,loadName);
-  llvm::Value *vR = byteSwap(vLoad);
-
-  llvm::Value *vX = regTbl.gprTbl[rt];
-  if(globals::isMipsEL) {
-    vMA = cfg->myIRBuilder->CreateSub(vThree, vMA);
-  }
-  llvm::Value *v0 =  cfg->myIRBuilder->CreateSub(vThree, vMA);
-  /* shift amt */
-  llvm::Value *v1 =  cfg->myIRBuilder->CreateMul(vEight, v0);
-  llvm::Value *vRs =  cfg->myIRBuilder->CreateLShr(vR, v1);
-
-  
-  llvm::Value *v2 =  cfg->myIRBuilder->CreateAdd(vOne, vMA);
-  llvm::Value *v3 =  cfg->myIRBuilder->CreateMul(vEight, v2);
-  llvm::Value *v4 =  cfg->myIRBuilder->CreateShl(vOne, v3);
-  llvm::Value *v5 =  cfg->myIRBuilder->CreateSub(v4, vOne);
-  llvm::Value *v6 =  cfg->myIRBuilder->CreateNot(v5);
-  
-  llvm::Value *vXm =  cfg->myIRBuilder->CreateAnd(vX, v6);
-  regTbl.gprTbl[rt] = cfg->myIRBuilder->CreateOr(vRs, vXm);
-  return false;
-}
-
 void insn_lui::updateGPRConstants(std::vector<regState> &gprConstState) {
   gprConstState[rt].e = constant;
   gprConstState[rt].v = uimm<<16;
@@ -2904,35 +1903,6 @@ bool insn_bgtz::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTb
   return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_SGT, vRT, vRS);
 }
 
-bool insn_bgezl::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vRT = llvm::ConstantInt::get(iType32,0);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_SGE, vRT, vRS);
-}
-
-bool insn_bltzl::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vRT = llvm::ConstantInt::get(iType32,0);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_SLT, vRT, vRS);
-}
-bool insn_blezl::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vRT = llvm::ConstantInt::get(iType32,0);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_SLE, vRT, vRS);
-}
-bool insn_bgtzl::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vRT = llvm::ConstantInt::get(iType32,0);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_SGT, vRT, vRS);
-}
 
 bool insn_bne::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
   llvm::Value *vRT = regTbl.gprTbl[rt];
@@ -2940,21 +1910,8 @@ bool insn_bne::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl
   return handleBranch(cBB,nInst,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
 }
 
-bool insn_bnel::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_NE, vRT, vRS);
-}
 
 bool insn_beq::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_EQ, vRT, vRS);
-}
-
-
-
-bool insn_beql::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
   llvm::Value *vRT = regTbl.gprTbl[rt];
   llvm::Value *vRS = regTbl.gprTbl[rs];
   return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_EQ, vRT, vRS);
@@ -3146,12 +2103,6 @@ bool insn_fsqrt::canCompile() const {
 bool insn_mtc1::canCompile() const {
   return true;
 }
-bool insn_bc1x::canCompile() const {
-  return true;
-}
-bool fpLikelyBranchInsn::canCompile() const {
-  return true;
-}
 
 bool insn_cvts::canCompile() const {
   return true;
@@ -3296,55 +2247,6 @@ bool insn_mtc1::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTb
   return false;
 }
 
-fpBranchInsn::fpBranchInsn(uint32_t inst, uint32_t addr) :
-  coprocType1Insn(inst, addr), cc((inst >> 18) & 7),
-  himm((int16_t)(inst & ((1<<16) - 1))) {
-  int32_t imm = ((int32_t)himm) << 2;
-  tAddr = imm+addr+4;
-  ntAddr = addr+8;
-}
-
-void fpBranchInsn::recUses(cfgBasicBlock *cBB) {
-  cBB->fcrRead[CP1_CR25]=true;
-}
-
-void fpBranchInsn::recDefines(cfgBasicBlock *cBB, regionCFG *cfg){}
-
-bool insn_bc1x::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) {
-  llvm::Value *vZ = llvm::ConstantInt::get(cfg->type_int32,0);
-  llvm::Value *vCode = getConditionCode(cfg,regTbl, cc);
-  llvm::Value *vCMP = nullptr;
-  std::string brName = "bc1x_" + toStringHex(addr);
-  dbt_assert(brType != -1);
-  if(brType == 1) {
-    /* bc1t */
-    vCMP = cfg->myIRBuilder->CreateICmpNE(vCode, vZ, brName);
-  }
-  else {
-    /* bc1f */
-    vCMP = cfg->myIRBuilder->CreateICmpEQ(vCode, vZ, brName);
-  }
-
-  /* generate branch delay slot code */
-  nInst->codeGen(cBB, nullptr, regTbl);
-
-#if 0
-  std::cerr<<getAsmString(inst, addr)<<std::endl;
-  std::cerr<<"curr address = "<<std::hex<<addr<<std::dec<<std::endl;
-  std::cerr<<"taken address = "<<std::hex<<tAddr<<std::dec<<std::endl;
-  std::cerr<<"ntaken address = "<<std::hex<<ntAddr<<std::dec<<std::endl;
-#endif
-  llvm::BasicBlock *tBB = cBB->getSuccLLVMBasicBlock(tAddr);
-  llvm::BasicBlock *ntBB = cBB->getSuccLLVMBasicBlock(ntAddr);
-  
-  tBB = cfg->generateAbortBasicBlock(tAddr, regTbl,cBB,tBB,addr);
-  ntBB = cfg->generateAbortBasicBlock(ntAddr,regTbl,cBB,ntBB,addr);
-  
-  cfg->myIRBuilder->CreateCondBr(vCMP, tBB, ntBB);
-  cBB->hasTermBranchOrJump = true;
-
-  return true;
-}
 
 
 void insn_cvts::recUses(cfgBasicBlock *cBB) {

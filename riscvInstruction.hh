@@ -217,24 +217,6 @@ public:
 };
 
 
-class fpBranchInsn : public coprocType1Insn, public abstractBranch {
-protected:
-  uint32_t cc;
-  int16_t himm;
-  uint32_t tAddr, ntAddr;
-public:
-  fpBranchInsn(uint32_t inst, uint32_t addr);
-  uint32_t getTakenAddr() const override { 
-    return tAddr; 
-  }
-  uint32_t getNotTakenAddr() const override { 
-    return ntAddr; 
-  }
-  void recUses(cfgBasicBlock *cBB) override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
-  opPrecType getPrecType() const override {
-    return fpspecialprec;
-  }
-};
+
 
 #endif
