@@ -20,11 +20,12 @@
 #define ELIDE_LLVM
 #include "globals.hh"
 
+
 #ifdef __APPLE__
-#include "TargetConditionals.h"
-#ifdef TARGET_OS_MAC
-#include "osx_elf.h"
-#endif
+#include <TargetConditionals.h>
+#if TARGET_OS_MAC
+#include <libelf/gelf.h>
+#endif /* TARGET_OS_MAC */
 #else
 #include <elf.h>
 #endif
