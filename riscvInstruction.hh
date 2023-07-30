@@ -103,78 +103,48 @@ public:
 
 
 class rTypeInsn : public Insn {
- protected:
- uint32_t rd, rs, rt;
- public:
+public:
   rTypeInsn(uint32_t inst, uint32_t addr, insnDefType insnType = insnDefType::gpr) :
-   Insn(inst, addr, insnType),
-   rd((inst >> 11) & 31),
-   rs((inst >> 21) & 31),
-   rt((inst >> 16) & 31){}
+   Insn(inst, addr, insnType){}
  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
  void recUses(cfgBasicBlock *cBB) override;
+  bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
 };
 
-class rTypeJumpRegInsn : public rTypeInsn {
+
+class insn_j : public Insn {
 public:
-  rTypeJumpRegInsn(uint32_t inst, uint32_t addr, insnDefType insnType = insnDefType::no_dest) :
-    rTypeInsn(inst, addr, insnType) {};
-};
-
-class jTypeInsn : public Insn {
- protected:
- uint32_t jaddr;
- public:
-  jTypeInsn(uint32_t inst, uint32_t addr, insnDefType insnType = insnDefType::no_dest) :
-    Insn(inst, addr, insnType) {
-    jaddr = inst & ((1<<26)-1);
-    jaddr <<= 2;
-    jaddr |= ((addr+4) & (~((1<<28)-1)));
-  }
-  uint32_t getJumpAddr() const {
-    return jaddr;
-  }
-};
-
-class insn_j : public jTypeInsn {
-public:
-  insn_j(uint32_t inst, uint32_t addr) : jTypeInsn(inst, addr) {}
+  insn_j(uint32_t inst, uint32_t addr) :
+    Insn(inst, addr, insnDefType::no_dest) {}
   bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {}
   void recUses(cfgBasicBlock *cBB) override {}
-  uint32_t destRegister() const override {
-    return 0;
-  }
 };
 
-class insn_jal : public jTypeInsn {
+class insn_jal : public Insn {
 public:
   insn_jal(uint32_t inst, uint32_t addr) :
-    jTypeInsn(inst, addr, insnDefType::gpr) {}
+    Insn(inst, addr, insnDefType::gpr) {}
   bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
   void recUses(cfgBasicBlock *cBB) override {}
-  uint32_t destRegister() const override {
-    return 31;
-  }
-  
 };
 
 
-class insn_jr : public rTypeJumpRegInsn {
+class insn_jr : public Insn {
 public:
   insn_jr(uint32_t inst, uint32_t addr) :
-    rTypeJumpRegInsn(inst, addr) {}
+    Insn(inst, addr, insnDefType::no_dest) {}
   bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   bool canCompile() const override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {}
   void recUses(cfgBasicBlock *cBB) override;
 };
 
-class insn_jalr : public rTypeJumpRegInsn {
+class insn_jalr : public Insn {
 public:
   insn_jalr(uint32_t inst, uint32_t addr) :
-    rTypeJumpRegInsn(inst, addr, insnDefType::gpr) {}
+    Insn(inst, addr, insnDefType::gpr) {}
   bool canCompile() const override;
   bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;

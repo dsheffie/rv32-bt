@@ -16,19 +16,21 @@ void cfgBasicBlock::addWithInCFGEdges(regionCFG *cfg) {
   /* if this block has a branch, search if successor
    * is in CFG region */
   iBranchTypeInsn *iBranch = nullptr;
-  jTypeInsn *jJump = nullptr;
-  rTypeInsn *jrInsn = nullptr;
+  //jTypeInsn *jJump = nullptr;
+  //rTypeInsn *jrInsn = nullptr;
   std::map<uint32_t,cfgBasicBlock*>::iterator mit0,mit1;
   uint32_t tAddr=~0,ntAddr=~0;
 
   /* this is crappy code */
   for(ssize_t i = insns.size()-1; i >= 0; i--) {
     iBranch = dynamic_cast<iBranchTypeInsn*>(insns[i]);
-    if(iBranch) break;
-    jJump = dynamic_cast<jTypeInsn*>(insns[i]);
-    if(jJump) break;
-    jrInsn = dynamic_cast<rTypeJumpRegInsn*>(insns[i]);
-    if(jrInsn) break;
+    if(iBranch)
+      break;
+    //jJump = dynamic_cast<jTypeInsn*>(insns[i]);
+    //if(jJump)
+    //break;
+    //jrInsn = dynamic_cast<rTypeJumpRegInsn*>(insns[i]);
+    //if(jrInsn) break;
   }
   
 #define PRINT_ADDED_EDGE(TGT) {\
@@ -50,6 +52,7 @@ void cfgBasicBlock::addWithInCFGEdges(regionCFG *cfg) {
       addSuccessor(mit1->second); 
     }
   }
+#if 0
   else if(jJump) {
     tAddr = jJump->getJumpAddr();
     mit0 = cfg->cfgBlockMap.find(tAddr);
@@ -67,6 +70,7 @@ void cfgBasicBlock::addWithInCFGEdges(regionCFG *cfg) {
       addSuccessor(mit0->second);
     }
   }
+#endif
 
 }
 

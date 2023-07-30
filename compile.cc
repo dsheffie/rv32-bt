@@ -4,7 +4,7 @@
 #include "riscv.hh"
 #define ELIDE_LLVM
 #include "globals.hh"
-#include <unordered_set>
+#include <iostream>
 
 bool compile::canCompileInstr(uint32_t inst) {
   bool rc = false;
@@ -14,21 +14,18 @@ bool compile::canCompileInstr(uint32_t inst) {
     {
     case 0x3:  /* loads */
     case 0xf:  /* fence - there's a bunch of 'em */
-      return false;
     case 0x13: /* reg + imm insns */
-      return true;
     case 0x23: /* stores */
-      return true;
     case 0x37: /* lui */
     case 0x17: /* auipc */
     case 0x67: /* jalr */
     case 0x6f: /* jal */
     case 0x33:  /* reg + reg insns */
-      return false;
     case 0x63: /* branches */
-      rc = true;
+      return true;
     break;
     case 0x73:
+      std::cout << "opcode stops bt " << std::hex << opcode << std::dec << "\n";
       rc = false;
       break;
     
