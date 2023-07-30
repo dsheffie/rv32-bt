@@ -15,10 +15,6 @@ class Insn;
 enum regEnum {uninit=0,constant,variant};
 enum opPrecType {integerprec=0,singleprec,doubleprec,fpspecialprec,unknownprec,dummyprec};
 
-struct regState {
-  regEnum e;
-  uint32_t v;
-};
 
 Insn* getInsn(uint32_t inst, uint32_t addr);
 
@@ -41,7 +37,6 @@ public:
   std::string getString() const;
   
   virtual bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl);
-  virtual void updateGPRConstants(std::vector<regState> &gprConstState);
   virtual void recDefines(cfgBasicBlock *cBB, regionCFG *cfg);
   virtual void recUses(cfgBasicBlock *cBB);
   
@@ -108,7 +103,6 @@ public:
   uint32_t getNotTakenAddr() const override { 
     return ntAddr; 
   }
-  void updateGPRConstants(std::vector<regState> &gprConstState) override {/*no writes*/}
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override ;
   void recUses(cfgBasicBlock *cBB) override;
   virtual bool handleBranch(cfgBasicBlock *cBB, llvmRegTables& regTbl,
@@ -126,12 +120,8 @@ class rTypeInsn : public Insn {
    rd((inst >> 11) & 31),
    rs((inst >> 21) & 31),
    rt((inst >> 16) & 31){}
- void updateGPRConstants(std::vector<regState> &gprConstState) override ;
  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
  void recUses(cfgBasicBlock *cBB) override;
- virtual uint32_t doOp(uint32_t a, uint32_t b) {
-  return ~0;
- }
 };
 
 class rTypeJumpRegInsn : public rTypeInsn {
@@ -153,7 +143,6 @@ class jTypeInsn : public Insn {
   uint32_t getJumpAddr() const {
     return jaddr;
   }
-  void updateGPRConstants (std::vector<regState> &gprConstState) override {}
 };
 
 class insn_j : public jTypeInsn {
@@ -176,9 +165,6 @@ public:
   void recUses(cfgBasicBlock *cBB) override {}
   uint32_t destRegister() const override {
     return 31;
-  }
-  void updateGPRConstants(std::vector<regState> &gprConstState) override {
-    gprConstState[31].e = variant; 
   }
   
 };

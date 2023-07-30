@@ -24,17 +24,12 @@ std::ostream &operator<<(std::ostream &out, const Insn &ins) {
 class iTypeLoadInsn : public iTypeInsn {
 public:
   iTypeLoadInsn(uint32_t inst, uint32_t addr) : iTypeInsn(inst, addr) {}
-  void updateGPRConstants(std::vector<regState> &gprConstState) override {
-    gprConstState[rt].e = variant;
-    gprConstState[rt].v = ~0;
-  }
 };
 
 class iTypeStoreInsn : public iTypeInsn {
 public:
   iTypeStoreInsn(uint32_t inst, uint32_t addr) :
     iTypeInsn(inst, addr,insnDefType::no_dest) {}
-  void updateGPRConstants(std::vector<regState> &gprConstState) override {}
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
   void recUses(cfgBasicBlock *cBB) override;
 };
@@ -52,7 +47,6 @@ public:
   simpleRType(uint32_t inst, uint32_t addr, rtype r_type) :
     rTypeInsn(inst,addr), r_type(r_type) {}
   bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
-  uint32_t doOp(uint32_t a, uint32_t b) override;
 };
 
 class simpleIType : public iTypeInsn {
@@ -70,21 +64,18 @@ class insn_sll : public simpleRType {
 public:
   insn_sll(uint32_t inst, uint32_t addr) :
     simpleRType(inst, addr, simpleRType::rtype::sll) {}
-  void updateGPRConstants(std::vector<regState> &gprConstState) override ;
 };
 
 class insn_srl : public simpleRType {
  public:
  insn_srl(uint32_t inst, uint32_t addr) :
    simpleRType(inst, addr, simpleRType::rtype::srl) {}
-  void updateGPRConstants(std::vector<regState> &gprConstState) override;
 };
 
 class insn_sra : public simpleRType {
  public:
   insn_sra(uint32_t inst, uint32_t addr) :
     simpleRType(inst, addr, simpleRType::rtype::sra) {}
-  void updateGPRConstants(std::vector<regState> &gprConstState) override;
 };
 
 class insn_sllv : public simpleRType {
@@ -238,7 +229,6 @@ class insn_addiu : public simpleIType {
  public:
   insn_addiu(uint32_t inst, uint32_t addr) :
     simpleIType(inst, addr, simpleIType::itype::addiu) {}
- void updateGPRConstants(std::vector<regState> &gprConstState) override;
 };
 
 class insn_slti : public iTypeInsn {
@@ -259,28 +249,24 @@ class insn_andi : public simpleIType {
 public:
   insn_andi(uint32_t inst, uint32_t addr) :
     simpleIType(inst, addr,simpleIType::itype::andi) {}
-  void updateGPRConstants(std::vector<regState> &gprConstState) override;
 };
 
 class insn_ori : public simpleIType {
  public:
   insn_ori(uint32_t inst, uint32_t addr) :
     simpleIType(inst, addr,simpleIType::itype::ori) {}
- void updateGPRConstants(std::vector<regState> &gprConstState) override;
 };
 
 class insn_xori : public simpleIType {
  public:
   insn_xori(uint32_t inst, uint32_t addr) :
     simpleIType(inst, addr,simpleIType::itype::xori) {}
-  void updateGPRConstants(std::vector<regState> &gprConstState) override;
 };
 
 class insn_lui : public simpleIType {
  public:
  insn_lui(uint32_t inst, uint32_t addr) :
    simpleIType(inst, addr, simpleIType::itype::lui) {}
- void updateGPRConstants(std::vector<regState> &gprConstState) override;
 };
 
 
@@ -348,15 +334,11 @@ std::string Insn::getString() const {
   return ss.str();
 }
 
-
 bool Insn::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl){
   die();
   return false;
 }
 
-void Insn::updateGPRConstants(std::vector<regState> &gprConstState) {
-
-}
 
 void Insn::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
 }
@@ -423,16 +405,6 @@ void rTypeInsn::recUses(cfgBasicBlock *cBB) {
   cBB->gprRead[rt]=true;
 }
 
-void rTypeInsn::updateGPRConstants(std::vector<regState> &gprConstState) {
-  if((gprConstState[rs].e == constant) && (gprConstState[rt].e == constant)) {
-    gprConstState[rd].e = constant;
-    gprConstState[rd].v = doOp(gprConstState[rs].v, gprConstState[rt].v);
-  }
-  else {
-    gprConstState[rd].e = variant;
-    gprConstState[rd].v = ~0;
-  }
-}
 
 
 void insn_jalr::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
@@ -614,38 +586,6 @@ Insn* getInsn(uint32_t inst, uint32_t addr){
 
 
 
-uint32_t simpleRType::doOp(uint32_t a, uint32_t b) {
-  switch(r_type)
-    {
-    case rtype::addu:
-      return a+b;
-    case rtype::subu:
-      return a-b;
-    case rtype::or_:
-      return a|b;
-    case rtype::and_:
-      return a&b;
-    case rtype::nor_:
-      return ~(a|b);
-    case rtype::xor_:
-      return a^b;
-    case rtype::sll:
-      return a << ((inst>>6)&31);
-    case rtype::srl:
-      return a >> ((inst>>6)&31);
-    case rtype::srlv:
-      return a>>b;
-    case rtype::sllv:
-      return a<<b;
-    case rtype::sra:
-      return static_cast<int32_t>(a) << ((inst >> 6) & 31);
-    case rtype::srav:
-      return static_cast<int32_t>(a) << b;
-    default:
-      assert(false);
-    }
-  return 0;
-}
 
 bool simpleIType::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
   using namespace llvm;
@@ -748,52 +688,6 @@ bool simpleRType::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
   return false;
 }
 
-void insn_sll::updateGPRConstants(std::vector<regState> &gprConstState) {
-  if(gprConstState[rt].e == constant) {
-    gprConstState[rd].e = constant;
-    gprConstState[rd].v = doOp(gprConstState[rt].v, ~0);
-  }
-  else {
-    gprConstState[rd].e = variant;
-    gprConstState[rd].v = ~0;
-  }
-}
-  
-  
-void insn_srl::updateGPRConstants(std::vector<regState> &gprConstState) {
-  if(gprConstState[rt].e == constant) {
-    gprConstState[rd].e = constant;
-    gprConstState[rd].v = doOp(gprConstState[rt].v, ~0);
-  }
-  else {
-    gprConstState[rd].e = variant;
-    gprConstState[rd].v = ~0;
-  }
-}  
-
-void insn_sra::updateGPRConstants(std::vector<regState> &gprConstState) {
-  if(gprConstState[rt].e == constant) {
-    gprConstState[rd].e = constant;
-    gprConstState[rd].v = doOp(gprConstState[rt].v, ~0);
-  }
-  else {
-    gprConstState[rd].e = variant;
-    gprConstState[rd].v = ~0;
-  }
-}
-
-
-  
-void insn_addiu::updateGPRConstants(std::vector<regState> &gprConstState) {
-  if(gprConstState[rs].e == constant) {
-    gprConstState[rt].e = constant;
-    gprConstState[rt].v = gprConstState[rs].v + (uimm<<16);
-  }
-  else {
-    gprConstState[rt].e = variant;
-    gprConstState[rt].v = ~0;
-  }
-}
 
 bool insn_sb::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
   llvm::Value *vIMM = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*(cfg->Context)),simm);
@@ -922,43 +816,8 @@ bool insn_lw::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
   return false;
 }
 
-void insn_lui::updateGPRConstants(std::vector<regState> &gprConstState) {
-  gprConstState[rt].e = constant;
-  gprConstState[rt].v = uimm<<16;
-}
 
-void insn_andi::updateGPRConstants(std::vector<regState> &gprConstState) {
-    if(gprConstState[rs].e == constant) {
-      gprConstState[rt].e = constant;
-      gprConstState[rt].v = gprConstState[rs].v + (uimm<<16);
-    }
-    else {
-      gprConstState[rt].e = variant;
-      gprConstState[rt].v = ~0;
-    }
-}
 
-void insn_xori::updateGPRConstants(std::vector<regState> &gprConstState) {
-  if(gprConstState[rs].e == constant) {
-    gprConstState[rt].e = constant;
-    gprConstState[rt].v = gprConstState[rs].v ^ (uimm<<16);
-  }
-  else {
-    gprConstState[rt].e = variant;
-    gprConstState[rt].v = ~0;
-  }
-}
-
-void insn_ori::updateGPRConstants(std::vector<regState> &gprConstState) {
-  if(gprConstState[rs].e == constant) {
-    gprConstState[rt].e = constant;
-    gprConstState[rt].v = gprConstState[rs].v | (uimm<<16);
-  }
-  else {
-    gprConstState[rt].e = variant;
-    gprConstState[rt].v = ~0;
-  }
-}
 
 bool insn_slti::generateIR(cfgBasicBlock *cBB,   llvmRegTables& regTbl) {
   llvm::LLVMContext &cxt = *(cfg->Context);
@@ -985,46 +844,40 @@ bool insn_sltiu::generateIR(cfgBasicBlock *cBB,   llvmRegTables& regTbl) {
 }
 
 bool insn_bltu::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vRT = llvm::ConstantInt::get(iType32,0);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
+  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
+  llvm::Value *vRS = regTbl.gprTbl[r.r.rs2];
   return handleBranch(cBB, regTbl,llvm::CmpInst::ICMP_SLT, vRT, vRS);
 }
 
 bool insn_blt::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vRT = llvm::ConstantInt::get(iType32,0);
-  llvm::Value *vRS = regTbl.gprTbl[rs];
+  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
+  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
   return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_SLT, vRT, vRS);
 }
 
 bool insn_bne::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vRS = regTbl.gprTbl[rs];
+  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
+  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
   return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
 }
 
 
 bool insn_beq::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vRS = regTbl.gprTbl[rs];
+  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
+  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
   return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_EQ, vRT, vRS);
 }
 
 
 bool insn_bge::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  assert(0);
+  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
+  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
   return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
 }
 
 bool insn_bgeu::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  assert(0);
+  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
+  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
   return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
 }
 

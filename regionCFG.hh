@@ -189,7 +189,6 @@ class cfgBasicBlock {
 
   std::map<llvm::BasicBlock*, llvm::BasicBlock*> jrMap;
 
-  std::vector<regState> gprConstState;
   std::set<cfgBasicBlock*> preds;
   std::set<cfgBasicBlock*> succs;
   std::set<cfgBasicBlock*> dfrontier;
@@ -223,7 +222,6 @@ class cfgBasicBlock {
   uint32_t getExitAddr() const;
   uint32_t getEntryAddr() const;
   std::string getName() const;
-  void computeConstGPRs();
 
   void traverseAndRename(regionCFG *cfg);  
   void traverseAndRename(regionCFG *cfg, llvmRegTables regTbl);

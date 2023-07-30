@@ -146,18 +146,6 @@ void cfgBasicBlock::addPhiNode(icntPhiNode *phi) {
   }
 }
 
-void cfgBasicBlock::computeConstGPRs() {
- 
-  for(size_t i = 0; i < insns.size(); i++) {
-    Insn *ins = insns[i];
-    ins->updateGPRConstants(gprConstState);
-  }
-  //for(size_t i = 0; i < 32; i++) {
-  //if(gprConstState[i].e == constant) {
-  //printf("reg %s is constant!\n", getGPRName(i,false).c_str());
-  //}
-  //}
-}
 
 bool cfgBasicBlock::has_jr_jalr() {
   for(size_t i = 0; i < insns.size(); i++) {
@@ -367,16 +355,6 @@ cfgBasicBlock::cfgBasicBlock(basicBlock *bb, bool isLikelyPatch) :
   fcrPhis.fill(nullptr);
   icntPhis.fill(nullptr);
   
-  for(size_t i = 0; i < 32; i++) {
-    if(i==0) {
-      regState rs = {constant,0};
-      gprConstState.push_back(rs);
-    }
-    else {
-      regState rs = {uninit,0xffffffff};
-      gprConstState.push_back(rs);
-    }
-  }
 
   if(bb) {
     ssize_t numInsns = bb->getVecIns().size();
