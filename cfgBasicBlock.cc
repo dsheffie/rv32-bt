@@ -581,13 +581,8 @@ void cfgBasicBlock::traverseAndRename(regionCFG *cfg, llvmRegTables prevRegTbl) 
   
   /* generate code for each instruction */
   for(size_t i = 0, n=insns.size(); i < n; i++) {
-    Insn *nInst = 0;
-    if((i+1) < insns.size())
-      nInst = insns[i+1];
-
     /* branch delay means we need to skip inst */
-    if(insns[i]->codeGen(this, nInst, regTbl))
-      i++;
+    insns[i]->codeGen(this, regTbl);
   }
 
   termRegTbl.copy(regTbl);

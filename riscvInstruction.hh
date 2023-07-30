@@ -37,7 +37,7 @@ public:
   void set(regionCFG *cfg, cfgBasicBlock *cBB);
   void emitPrintPC();
   size_t getInsnId();
-  bool codeGen(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl);
+  void codeGen(cfgBasicBlock *cBB, llvmRegTables& regTbl);
   std::string getString() const;
   
   virtual bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl);
@@ -89,15 +89,18 @@ public:
 
 class iBranchTypeInsn : public iTypeInsn, public abstractBranch {
 protected:
- bool isLikely;
  int32_t tAddr=0,ntAddr=0;
 public:
  iBranchTypeInsn(uint32_t inst, uint32_t addr) : 
    iTypeInsn(inst, addr, insnDefType::no_dest) {
-   simm <<= 2;
-   tAddr = simm + addr + 4;
-   ntAddr = addr + 8;
-   isLikely=false;
+   int32_t disp =
+     (r.b.imm4_1 << 1)  |
+     (r.b.imm10_5 << 5) |	
+     (r.b.imm11 << 11)  |
+     (r.b.imm12 << 12);
+   disp |= r.b.imm12 ? 0xffffe000 : 0x0;
+   tAddr = disp + addr;
+   ntAddr = addr + 4;
  }
   uint32_t getTakenAddr() const override { 
     return tAddr; 
@@ -105,13 +108,10 @@ public:
   uint32_t getNotTakenAddr() const override { 
     return ntAddr; 
   }
-  bool isLikelyBranch() const override {
-    return isLikely;
-  }
   void updateGPRConstants(std::vector<regState> &gprConstState) override {/*no writes*/}
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override ;
   void recUses(cfgBasicBlock *cBB) override;
-  virtual bool handleBranch(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl,
+  virtual bool handleBranch(cfgBasicBlock *cBB, llvmRegTables& regTbl,
 			    llvm::CmpInst::Predicate branchPred,
 			    llvm::Value *vRT, llvm::Value *vRS);
 };

@@ -30,14 +30,6 @@ public:
   }
 };
 
-class iBranchLikelyTypeInsn : public iBranchTypeInsn {
-public:
-  iBranchLikelyTypeInsn(uint32_t inst, uint32_t addr) : iBranchTypeInsn(inst,addr) {}
-  bool handleBranch(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl,
-		    llvm::CmpInst::Predicate branchPred,
-		    llvm::Value *vRT, llvm::Value *vRS) override ;
-};
-
 class iTypeStoreInsn : public iTypeInsn {
 public:
   iTypeStoreInsn(uint32_t inst, uint32_t addr) :
@@ -127,18 +119,6 @@ private:
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {};
 };
 
-class insn_movn : public rTypeInsn {
-public:
-  insn_movn(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-};
-
-class insn_movz : public rTypeInsn {
-public:
-  insn_movz(uint32_t inst, uint32_t addr) :
-   rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-};
 
 class insn_syscall : public rTypeInsn {
  public:
@@ -224,19 +204,6 @@ public:
     simpleRType(inst, addr,simpleRType::rtype::sltu) {}
 };
 
-class insn_tge : public rTypeInsn {
-public:
-  insn_tge(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {}
-};
-
-class insn_teq : public rTypeInsn {
- public:
-  insn_teq(uint32_t inst, uint32_t addr) : rTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {}
-};
 
 /* iType */
 class insn_beq : public iBranchTypeInsn {
@@ -396,42 +363,6 @@ std::string Insn::getString() const {
   return ss.str();
 }
 
-static llvm::Value *getConditionCode(regionCFG *cfg, llvmRegTables& regTbl, uint32_t cc) {
-  //printf("getcc: condition code id = %u\n", cc);
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  llvm::Value *vOne = llvm::ConstantInt::get(iType32,1);
-  llvm::Value *vCC = llvm::ConstantInt::get(iType32,cc);
-  llvm::Value *vMask = cfg->myIRBuilder->CreateShl(vOne, vCC);
-  llvm::Value *vAnd = cfg->myIRBuilder->CreateAnd(regTbl.fcrTbl[CP1_CR25], vMask);
-  llvm::Value *vShr = cfg->myIRBuilder->CreateLShr(vAnd, vCC);
-  //std::string getccName = "getcc_" + std::to_string(cfg->getuuid()++);
-  return vShr;//cfg->myIRBuilder->CreateAnd(vShr, vOne, getccName);
-}
-
-static void setConditionCode(regionCFG *cfg, llvmRegTables& regTbl, 
-			     uint32_t cc, llvm::Value *vY) {
-  //printf("setcc: condition code id = %u\n", cc);
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-  
-  llvm::Value *vOne = llvm::ConstantInt::get(iType32,1);
-  llvm::Value *vZero = llvm::ConstantInt::get(iType32,0);
-  llvm::Value *vCC = llvm::ConstantInt::get(iType32,cc);
-  
-  vY = cfg->myIRBuilder->CreateSelect(vY, vOne, vZero);
-
-  llvm::Value *m0 = cfg->myIRBuilder->CreateShl(vOne, vCC);
-  llvm::Value *m1 = cfg->myIRBuilder->CreateNot(m0);
-  llvm::Value *s = cfg->myIRBuilder->CreateSub(vY,vOne);
-  llvm::Value *m2 = cfg->myIRBuilder->CreateNot(s);
-
-  llvm::Value *l = cfg->myIRBuilder->CreateAnd(regTbl.fcrTbl[CP1_CR25], m1);
-  llvm::Value *r = cfg->myIRBuilder->CreateAnd(m0, m2);
-
-  std::string setccName = "setcc_" + std::to_string(cfg->getuuid()++);
-  regTbl.fcrTbl[CP1_CR25] = cfg->myIRBuilder->CreateOr(l, r, setccName);
-}
 
 bool Insn::generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl){
   die();
@@ -490,8 +421,8 @@ void Insn::saveInstAddress() {
   cfg->myIRBuilder->CreateStore(vAddr, vG);
 }
 
-bool Insn::codeGen(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) {
-  return generateIR(cBB, nInst, regTbl);
+void Insn::codeGen(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
+  generateIR(cBB, nullptr, regTbl);
 }
 
 
@@ -529,57 +460,13 @@ void insn_jr::recUses(cfgBasicBlock *cBB) {
   cBB->gprRead[rs]=true;
 }
 
-coprocType1Insn::coprocType1Insn(uint32_t inst, uint32_t addr) : 
-  Insn(inst, addr), fmt((inst >> 21) & 31), ft((inst >> 16) & 31), 
-  fs((inst >> 11) & 31), fd((inst >> 6) & 31) {
-}
 
-bool coprocType1Insn::canCompile() const {
-  return false;
-}
-
-void coprocType1Insn::recDefines(cfgBasicBlock *cBB, regionCFG *cfg)  {
-  if(fmt == FMT_D) {
-    cfg->fprDefinitionBlocks[fd+0].insert(cBB);
-    cBB->updateFPRTouched(fd, fprUseEnum::doublePrec);
-  }
-  else if(fmt == FMT_S) {
-    cfg->fprDefinitionBlocks[fd+0].insert(cBB);
-    cBB->updateFPRTouched(fd, fprUseEnum::singlePrec);
-  }
-  else {
-    std::cerr << *this << "\n";
-    die();
-  }
-} 
-
-void coprocType1Insn::recUses(cfgBasicBlock *cBB)  {
-  cBB->fprRead[fs+0]=true;
-  cBB->fprRead[ft+0]=true;
-  if(fmt == FMT_D) {
-    cBB->updateFPRTouched(fs, fprUseEnum::doublePrec);
-    cBB->updateFPRTouched(ft, fprUseEnum::doublePrec);
-  }
-  else if(fmt == FMT_S) {
-    cBB->updateFPRTouched(fs, fprUseEnum::singlePrec);
-    cBB->updateFPRTouched(ft, fprUseEnum::singlePrec);
-  }
-  else {
-    std::cerr << *cBB;
-    die();
-  }
-
-}
-
-bool iBranchTypeInsn::handleBranch(cfgBasicBlock *cBB, Insn* nInst,
+bool iBranchTypeInsn::handleBranch(cfgBasicBlock *cBB,
 				   llvmRegTables& regTbl,
 				   llvm::CmpInst::Predicate branchPred,
 				   llvm::Value *vRT, llvm::Value *vRS) {
   llvm::Value *vCMP = cfg->myIRBuilder->CreateICmp(branchPred, vRS, vRT);
 
-  
-  /* generate branch delay slot code */
-  nInst->codeGen(cBB, nullptr, regTbl);
 
   llvm::BasicBlock *tBB = cBB->getSuccLLVMBasicBlock(tAddr);
   llvm::BasicBlock *ntBB = cBB->getSuccLLVMBasicBlock(ntAddr);
@@ -610,38 +497,6 @@ bool iBranchTypeInsn::handleBranch(cfgBasicBlock *cBB, Insn* nInst,
   return true;
 
 }
-
-bool iBranchLikelyTypeInsn::handleBranch(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl,
-					 llvm::CmpInst::Predicate branchPred,
-					 llvm::Value *vRT, llvm::Value *vRS) {
-  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmp(branchPred, vRS, vRT);
-
-  
-  cfgBasicBlock *patchBB = nullptr;
-
-  for(cfgBasicBlock* b : cBB->succs) {
-    if(b->isLikelyPatch) {
-      patchBB = b;
-      break;
-    }
-  }
-  if(patchBB==nullptr) {
-    printf("couldn't find patch basic block for %x\n", cBB->getEntryAddr());
-    cBB->print();
-    exit(-1);
-  }
-
-  llvm::BasicBlock *tBB = patchBB->lBB;
-  llvm::BasicBlock *ntBB = cBB->getSuccLLVMBasicBlock(ntAddr);
-
-  ntBB = cfg->generateAbortBasicBlock(ntAddr, regTbl, cBB, ntBB, addr);
-  cfg->myIRBuilder->CreateCondBr(vCMP, tBB, ntBB);
-    
-  cBB->hasTermBranchOrJump = true;
-
-  return false;
-}
-
 
 
 
@@ -1149,7 +1004,7 @@ bool insn_bltu::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTb
   llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
   llvm::Value *vRT = llvm::ConstantInt::get(iType32,0);
   llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_SLT, vRT, vRS);
+  return handleBranch(cBB, regTbl,llvm::CmpInst::ICMP_SLT, vRT, vRS);
 }
 
 bool insn_blt::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
@@ -1157,20 +1012,20 @@ bool insn_blt::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl
   llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
   llvm::Value *vRT = llvm::ConstantInt::get(iType32,0);
   llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_SLT, vRT, vRS);
+  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_SLT, vRT, vRS);
 }
 
 bool insn_bne::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
   llvm::Value *vRT = regTbl.gprTbl[rt];
   llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB,nInst,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
+  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
 }
 
 
 bool insn_beq::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
   llvm::Value *vRT = regTbl.gprTbl[rt];
   llvm::Value *vRS = regTbl.gprTbl[rs];
-  return handleBranch(cBB, nInst, regTbl,llvm::CmpInst::ICMP_EQ, vRT, vRS);
+  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_EQ, vRT, vRS);
 }
 
 
@@ -1178,21 +1033,20 @@ bool insn_bge::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl
   llvm::Value *vRT = regTbl.gprTbl[rt];
   llvm::Value *vRS = regTbl.gprTbl[rs];
   assert(0);
-  return handleBranch(cBB,nInst,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
+  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
 }
 
 bool insn_bgeu::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
   llvm::Value *vRT = regTbl.gprTbl[rt];
   llvm::Value *vRS = regTbl.gprTbl[rs];
   assert(0);
-  return handleBranch(cBB,nInst,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
+  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
 }
 
 
 bool insn_j::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
   llvm::BasicBlock *tBB = cBB->getSuccLLVMBasicBlock(jaddr);
 
-  nInst->codeGen(cBB, nullptr, regTbl);
   if(tBB==nullptr) {
     std::cerr << "COULDNT FIND 0x" << std::hex << jaddr
 	      << " from 0x" << addr
@@ -1208,7 +1062,6 @@ bool insn_j::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) 
 bool insn_jal::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {  
   llvm::LLVMContext &cxt = *(cfg->Context);
   regTbl.gprTbl[31] = llvm::ConstantInt::get(llvm::Type::getInt32Ty(cxt),(addr+8));
-  nInst->codeGen(cBB, nullptr, regTbl);
   cfgBasicBlock *nBB = *(cBB->succs.begin());
 #if 0
   if(cBB->succs.size() != 1) {
@@ -1246,7 +1099,6 @@ bool insn_jr::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl)
       llvm::Value *vCmp = cfg->myIRBuilder->CreateICmpEQ(vNPC, vAddr);
       cmpz.push_back(vCmp);
     }
-  nInst->codeGen(cBB, nullptr, regTbl);
 
   size_t p = 0;
   fallT[p++] = llvm::BasicBlock::Create(cxt,"ft",cfg->blockFunction);
@@ -1286,7 +1138,6 @@ bool insn_jalr::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTb
     cmpz.push_back(vCmp);
   }
   
-  nInst->codeGen(cBB, nullptr, regTbl);
 
   size_t p = 0;
   fallT[p++] = llvm::BasicBlock::Create(cxt,"ft",cfg->blockFunction);
@@ -1307,55 +1158,4 @@ bool insn_jalr::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTb
   return true;
 }
 
-
-bool insn_movn::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  llvm::Value *vRD = regTbl.gprTbl[rd];
-
-  llvm::Value *vZ = llvm::ConstantInt::get(llvm::Type::getInt32Ty(cxt),0);
-  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmpNE(vRT, vZ);
-  regTbl.gprTbl[rd] = cfg->myIRBuilder->CreateSelect(vCMP,vRS,vRD); 
-
-  return false;
-}
-
-bool insn_movz::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  llvm::LLVMContext &cxt = *(cfg->Context);
-  llvm::Value *vRT = regTbl.gprTbl[rt];
-  llvm::Value *vRS = regTbl.gprTbl[rs];
-  llvm::Value *vRD = regTbl.gprTbl[rd];
-
-  llvm::Value *vZ = llvm::ConstantInt::get(llvm::Type::getInt32Ty(cxt),0);
-  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmpEQ(vRT, vZ);
-  regTbl.gprTbl[rd] = cfg->myIRBuilder->CreateSelect(vCMP,vRS,vRD); 
-
-  return false;
-}
-
-bool insn_teq::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  return false;
-}
-
-bool insn_tge::generateIR(cfgBasicBlock *cBB, Insn *nInst, llvmRegTables& regTbl) {
-  return false;
-}
-
-opPrecType coprocType1Insn::getPrecType() const {
-  switch(fmt) {
-  case FMT_S:
-    return singleprec;
-    break;
-  case FMT_D:
-    return doubleprec;
-    break;
-  default: 
-    {
-      printf("has unk prec -> %s\n", getAsmString(inst, addr).c_str());
-      return unknownprec;
-      break;
-    }
-  }
-}
 
