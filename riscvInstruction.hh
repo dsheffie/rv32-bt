@@ -65,29 +65,20 @@ public:
 };
 
 class iTypeInsn : public Insn  {
-protected:
-  uint32_t rs, rt;
-  int32_t simm;
-  uint32_t uimm;
 public:
   iTypeInsn(uint32_t inst, uint32_t addr, insnDefType insnType = insnDefType::gpr) : 
-    Insn(inst, addr, insnType),
-    rs((inst >> 21) & 31),
-    rt((inst >> 16) & 31){
-    int16_t himm = (int16_t)(inst & ((1<<16) - 1));
-    simm = (int32_t)himm;
-    uimm = inst & ((1<<16) - 1);
-  }
+    Insn(inst, addr, insnType) {}
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
   void recUses(cfgBasicBlock *cBB) override;
+  bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
 };
 
-class iBranchTypeInsn : public iTypeInsn, public abstractBranch {
+class iBranchTypeInsn : public Insn, public abstractBranch {
 protected:
- int32_t tAddr=0,ntAddr=0;
+  int32_t tAddr=0,ntAddr=0;
 public:
  iBranchTypeInsn(uint32_t inst, uint32_t addr) : 
-   iTypeInsn(inst, addr, insnDefType::no_dest) {
+   Insn(inst, addr, insnDefType::no_dest) {
    int32_t disp =
      (r.b.imm4_1 << 1)  |
      (r.b.imm10_5 << 5) |	
