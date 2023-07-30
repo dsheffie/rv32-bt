@@ -241,13 +241,13 @@ int main(int argc, char *argv[]) {
     std::cerr << globals::binaryName << ": couldn't allocate backing memory!\n";
     exit(-1);
   }
+  memset(s, 0, sizeof(state_t));
   s->mem = mem;
   
   std::map<uint32_t, std::pair<std::string, uint32_t>> syms;
   
-  if(not(load_elf(filename.c_str(), s))){
-    return -1;
-  }
+  load_elf(filename.c_str(), s);
+
   globals::regionFinder = new region(cl, hotThresh);
   globals::cBB = new basicBlock(s->pc);
   initCapstone();
@@ -257,16 +257,17 @@ int main(int argc, char *argv[]) {
     std::cerr << globals::binaryName << ": returning from longjmp\n";
   }
 
+  
   if(not(globals::enableCFG)) {
     while(s->brk==0 and s->icnt < max_icnt) {
       interpret(s);
     }
   }
   else {
-      while(s->brk==0) {
-	if(not(globals::cBB->executeJIT(s)))
-	  interpretAndBuildCFG(s);
-      }
+    while(s->brk==0) {
+      if(not(globals::cBB->executeJIT(s)))
+	interpretAndBuildCFG(s);
+    }
   }
   estop = timestamp();
   double runtime = (estop-estart);

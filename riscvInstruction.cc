@@ -314,11 +314,7 @@ Insn* getInsn(uint32_t inst, uint32_t addr){
   uint32_t opcode = inst & 127;
   uint32_t rd = (inst>>7) & 31;
   riscv_t m(inst);
-  std::cout << "opcode = "
-	    << std::hex
-	    << opcode
-	    << std::dec
-	    << "\n";
+
   switch(opcode)
     {
     case 0x3:  /* loads */

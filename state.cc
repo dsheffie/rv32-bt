@@ -15,6 +15,8 @@ std::ostream &operator<<(std::ostream &out, const state_t & s) {
 }
 
 
-void initState(state_t *s){}
+void initState(state_t *s){
+
+}
 
 

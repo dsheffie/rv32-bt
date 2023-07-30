@@ -5,7 +5,7 @@
 
 struct state_t;
 
-bool load_elf(const char*, state_t *);
+void load_elf(const char*, state_t *);
 
 #endif 
 

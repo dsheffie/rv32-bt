@@ -372,6 +372,11 @@ void execRiscv(state_t *s) {
 		s->gpr[m.r.rd] = s->gpr[m.r.rs1] ^ s->gpr[m.r.rs2];
 		break;
 	      case 0x1:
+		if(s->gpr[m.r.rs2] == 0) {
+		  std::cout << "attempting to divide by zero, rs2 = " << m.r.rs2 << "\n";
+		  std::cout << std::hex << s->pc << std::dec << " : " << getAsmString(inst, s->pc) << "\n";
+		  abort();
+		}
 		s->gpr[m.r.rd] = s->gpr[m.r.rs1] / s->gpr[m.r.rs2];
 		break;
 	      default:
@@ -386,6 +391,11 @@ void execRiscv(state_t *s) {
 		s->gpr[rd] = (*reinterpret_cast<uint32_t*>(&s->gpr[m.r.rs1]) >> (s->gpr[m.r.rs2] & 31));
 		break;
 	      case 0x1: {
+		if(u_rs2 == 0) {
+		  std::cout << "attempting to divide by zero, rs2 = " << m.r.rs2 << "\n";
+		  std::cout << " : " << getAsmString(inst, s->pc) << "\n";
+		  abort();
+		}
 		*reinterpret_cast<uint32_t*>(&s->gpr[m.r.rd]) = u_rs1 / u_rs2;
 		break;
 	      }

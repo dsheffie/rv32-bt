@@ -1496,7 +1496,7 @@ basicBlock* regionCFG::run(state_t *ss) {
   globals::currUnit = this;
   uint64_t nextbb = 0;
   uint64_t i0=ss->icnt;
-
+  std::cout << "run region starting at pc " << std::hex << ss->pc << std::dec << "\n";
   codeBits(
 	   &(ss->pc), 
 	   ss->gpr,
@@ -1507,6 +1507,7 @@ basicBlock* regionCFG::run(state_t *ss) {
 	   );
   globals::cBB = reinterpret_cast<basicBlock*>(ss->abortloc);
   i0 = ss->icnt - i0;
+  std::cout << "ran " << i0 << " insns\n";
   minIcnt = std::min(minIcnt, i0);
   maxIcnt = std::max(maxIcnt, i0);
   runHistory[runs%histoLen] = i0;
