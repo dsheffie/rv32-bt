@@ -40,7 +40,7 @@ public:
   void codeGen(cfgBasicBlock *cBB, llvmRegTables& regTbl);
   std::string getString() const;
   
-  virtual bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl);
+  virtual bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl);
   virtual void updateGPRConstants(std::vector<regState> &gprConstState);
   virtual void recDefines(cfgBasicBlock *cBB, regionCFG *cfg);
   virtual void recUses(cfgBasicBlock *cBB);
@@ -159,7 +159,7 @@ class jTypeInsn : public Insn {
 class insn_j : public jTypeInsn {
 public:
   insn_j(uint32_t inst, uint32_t addr) : jTypeInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
+  bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {}
   void recUses(cfgBasicBlock *cBB) override {}
   uint32_t destRegister() const override {
@@ -171,7 +171,7 @@ class insn_jal : public jTypeInsn {
 public:
   insn_jal(uint32_t inst, uint32_t addr) :
     jTypeInsn(inst, addr, insnDefType::gpr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
+  bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
   void recUses(cfgBasicBlock *cBB) override {}
   uint32_t destRegister() const override {
@@ -188,7 +188,7 @@ class insn_jr : public rTypeJumpRegInsn {
 public:
   insn_jr(uint32_t inst, uint32_t addr) :
     rTypeJumpRegInsn(inst, addr) {}
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
+  bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   bool canCompile() const override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {}
   void recUses(cfgBasicBlock *cBB) override;
@@ -199,24 +199,11 @@ public:
   insn_jalr(uint32_t inst, uint32_t addr) :
     rTypeJumpRegInsn(inst, addr, insnDefType::gpr) {}
   bool canCompile() const override;
-  bool generateIR(cfgBasicBlock *cBB, Insn* nInst, llvmRegTables& regTbl) override;
+  bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
   void recUses(cfgBasicBlock *cBB) override;
 };
 
-class coprocType1Insn : public Insn {
-protected:
-  uint32_t fmt, ft, fs, fd;
-public:
-  coprocType1Insn(uint32_t inst, uint32_t addr);
-  bool isFloatingPoint() const override {
-    return true;
-  }
-  opPrecType getPrecType() const override;
-  bool canCompile() const override;
-  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
-  void recUses(cfgBasicBlock *cBB) override;
-};
 
 
 
