@@ -51,7 +51,7 @@ public:
 
 class simpleIType : public iTypeInsn {
 protected:
-  enum class itype {addiu,andi,lui,ori,xori};
+  enum class itype {addiu,andi,ori,xori};
   itype i_type;
 public:
   simpleIType(uint32_t inst, uint32_t addr, itype i_type) :
@@ -263,10 +263,31 @@ class insn_xori : public simpleIType {
     simpleIType(inst, addr,simpleIType::itype::xori) {}
 };
 
-class insn_lui : public simpleIType {
+class insn_lui : public Insn {
  public:
  insn_lui(uint32_t inst, uint32_t addr) :
-   simpleIType(inst, addr, simpleIType::itype::lui) {}
+   Insn(inst, addr) {}
+  bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override {
+    assert(0);
+    return false;
+  }
+  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {
+    cfg->gprDefinitionBlocks[r.u.rd].insert(cBB);
+  }  
+};
+
+class insn_auipc : public Insn {
+ public:
+ insn_auipc(uint32_t inst, uint32_t addr) :
+   Insn(inst, addr) {}
+  bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override {
+    assert(0);
+    return false;
+  }
+  void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {
+    cfg->gprDefinitionBlocks[r.u.rd].insert(cBB);
+  }
+  
 };
 
 
@@ -500,6 +521,8 @@ Insn* getInsn(uint32_t inst, uint32_t addr){
     case 0xf:  /* fence - there's a bunch of 'em */
       break;
     case 0x13: /* reg + imm insns */
+      std::cout << m.i.sel << "\n";
+
       switch(m.i.sel)
 	{
 	case 0: /* addi */
@@ -551,13 +574,14 @@ Insn* getInsn(uint32_t inst, uint32_t addr){
       break;
     }
     case 0x37: /* lui */
+      return new insn_lui(inst, addr);
     case 0x17: /* auipc */
+      return new insn_auipc(inst, addr);
     case 0x67: /* jalr */
     case 0x6f: /* jal */
     case 0x33:  /* reg + reg insns */
       return nullptr;
     case 0x63: /* branches */
-      std::cout << m.b.sel << "\n";
       switch(m.b.sel)
 	{
 	case 0: /* beq */
@@ -591,32 +615,29 @@ bool simpleIType::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
   using namespace llvm;
   LLVMContext &cxt = *(cfg->Context);
   Type *iType32 = Type::getInt32Ty(cxt);
-  Value *vRT = nullptr;
+  Value *vRD = nullptr;
   switch(i_type)
     {
     case itype::addiu:
-    vRT = cfg->myIRBuilder->CreateAdd(regTbl.gprTbl[rs],
-				      ConstantInt::get(iType32,simm));
-    break;
+      vRD = cfg->myIRBuilder->CreateAdd(regTbl.gprTbl[r.i.rs1],
+					ConstantInt::get(iType32,simm));
+      break;
     case itype::andi:
-      vRT = cfg->myIRBuilder->CreateAnd(regTbl.gprTbl[rs],
+      vRD = cfg->myIRBuilder->CreateAnd(regTbl.gprTbl[r.i.rs1],
 					ConstantInt::get(iType32,uimm));
       break;
-    case itype::lui:
-      vRT = ConstantInt::get(iType32,uimm<<16);
-      break;
     case itype::ori:
-      vRT = cfg->myIRBuilder->CreateOr(regTbl.gprTbl[rs],
+      vRD = cfg->myIRBuilder->CreateOr(regTbl.gprTbl[r.i.rs1],
 				       ConstantInt::get(iType32,uimm));
       break;
     case itype::xori:
-      vRT = cfg->myIRBuilder->CreateXor(regTbl.gprTbl[rs],
+      vRD = cfg->myIRBuilder->CreateXor(regTbl.gprTbl[r.i.rs1],
 					ConstantInt::get(iType32,uimm));
       break;
     default:
       assert(false);
     }
-  regTbl.gprTbl[rt] = vRT;
+  regTbl.gprTbl[r.i.rd] = vRD;
   return false;
 }
 
@@ -846,7 +867,7 @@ bool insn_sltiu::generateIR(cfgBasicBlock *cBB,   llvmRegTables& regTbl) {
 bool insn_bltu::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
   llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
   llvm::Value *vRS = regTbl.gprTbl[r.r.rs2];
-  return handleBranch(cBB, regTbl,llvm::CmpInst::ICMP_SLT, vRT, vRS);
+  return handleBranch(cBB, regTbl,llvm::CmpInst::ICMP_ULT, vRT, vRS);
 }
 
 bool insn_blt::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
@@ -872,13 +893,13 @@ bool insn_beq::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
 bool insn_bge::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
   llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
   llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
-  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
+  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_SGE,vRT,vRS);
 }
 
 bool insn_bgeu::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
   llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
   llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
-  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
+  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_UGE,vRT,vRS);
 }
 
 
