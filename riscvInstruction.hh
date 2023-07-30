@@ -5,6 +5,7 @@
 #include <cstdint>
 #include "ssaInsn.hh"
 #include "llvmInc.hh"
+#include "riscv.hh"
 
 class cfgBasicBlock;
 class regionCFG;
@@ -25,6 +26,7 @@ class Insn : public ssaInsn {
 protected:
   friend std::ostream &operator<<(std::ostream &out, const Insn &ins);
   uint32_t inst, addr;
+  riscv_t r;
   regionCFG *cfg = nullptr;
   cfgBasicBlock *myBB = nullptr;
   
@@ -56,7 +58,7 @@ public:
     return addr;
   }
   Insn(uint32_t inst, uint32_t addr, insnDefType insnType = insnDefType::unknown) :
-    ssaInsn(insnType), inst(inst), addr(addr) {
+    ssaInsn(insnType), inst(inst), addr(addr), r(inst) {
   }
   virtual ~Insn() {}
 };
