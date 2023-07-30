@@ -872,10 +872,10 @@ bool regionCFG::analyzeGraph() {
     die();
   }
 
-  if(globals::dumpIR) {
+  //if(globals::dumpIR) {
     dumpIR();
     dumpLLVM();
-  }
+    //}
 
   return true;
 }
@@ -925,20 +925,15 @@ void regionCFG::initLLVMAndGeneratePreamble() {
   
   blockArgTypes.push_back(type_iPtr32);
   blockArgNames.push_back("pc");
+
   blockArgTypes.push_back(type_iPtr32);
   blockArgNames.push_back("gpr");
-  blockArgTypes.push_back(type_iPtr32);
-  blockArgNames.push_back("cpr0");
-  blockArgTypes.push_back(type_iPtr32);
-  blockArgNames.push_back("cpr1");
-  blockArgTypes.push_back(type_iPtr32);
-  blockArgNames.push_back("fcr1");
+  
+  
   blockArgTypes.push_back(type_iPtr8);
   blockArgNames.push_back("mem");
-  blockArgTypes.push_back(type_iPtr32);
-  blockArgNames.push_back("lo");
-  blockArgTypes.push_back(type_iPtr32);
-  blockArgNames.push_back("hi");
+  
+  
   blockArgTypes.push_back(type_iPtr64);
   blockArgNames.push_back("icnt");
   blockArgTypes.push_back(type_iPtr64);

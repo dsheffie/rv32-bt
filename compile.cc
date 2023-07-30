@@ -14,13 +14,17 @@ bool compile::canCompileInstr(uint32_t inst) {
     {
     case 0x3:  /* loads */
     case 0xf:  /* fence - there's a bunch of 'em */
+      return false;
     case 0x13: /* reg + imm insns */
-    case 0x23: /* stores */      
+      return true;
+    case 0x23: /* stores */
+      return true;
     case 0x37: /* lui */
     case 0x17: /* auipc */
     case 0x67: /* jalr */
     case 0x6f: /* jal */
-    case 0x33:  /* reg + reg insns */     
+    case 0x33:  /* reg + reg insns */
+      return false;
     case 0x63: /* branches */
       rc = true;
     break;

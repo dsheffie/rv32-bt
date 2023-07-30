@@ -329,19 +329,7 @@ void Insn::set(regionCFG *cfg, cfgBasicBlock *cBB) {
 }
 
 llvm::Value *Insn::byteSwap(llvm::Value *v) {
-  if(globals::isMipsEL) {
-    return v;
-  }
-  else {
-    std::vector<llvm::Type*> typeVec;
-    typeVec.push_back(v->getType());
-    llvm::ArrayRef<llvm::Type*> typeArrRef(typeVec);
-    auto vswapIntr = llvm::Intrinsic::getDeclaration(cfg->myModule, 
-							     llvm::Intrinsic::bswap, 
-							     typeArrRef);
-    llvm::Value *vswapCall = cfg->myIRBuilder->CreateCall(vswapIntr, v);
-    return vswapCall;
-  }
+  return v;
 }
 
 void Insn::emitPrintPC() {
@@ -708,14 +696,12 @@ bool insn_sw::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
   disp |= ((inst>>31)&1) ? 0xfffff000 : 0x0;
   llvm::Value *vIMM = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*(cfg->Context)),disp);
   llvm::Value *vRS = regTbl.gprTbl[r.s.rs1];
-  llvm::Value *vRT = regTbl.gprTbl[r.s.rs2];
   llvm::Value *vEA = cfg->myIRBuilder->CreateAdd(vRS, vIMM);
   llvm::Value *vZEA = cfg->myIRBuilder->CreateZExt(vEA, llvm::Type::getInt64Ty(cxt));
   llvm::Value *vMem = cfg->blockArgMap["mem"];
   llvm::Value *vGEP = cfg->myIRBuilder->CreateGEP(vMem, vZEA);
   llvm::Value *vPtr = cfg->myIRBuilder->CreateBitCast(vGEP, llvm::Type::getInt32PtrTy(cxt));
-  llvm::Value *vSwap = byteSwap(vRT);
-  cfg->myIRBuilder->CreateStore(vSwap, vPtr);
+  cfg->myIRBuilder->CreateStore(regTbl.gprTbl[r.s.rs2], vPtr);
   return false;
 }
 
