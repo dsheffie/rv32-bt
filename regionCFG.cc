@@ -877,6 +877,7 @@ bool regionCFG::analyzeGraph() {
     dumpLLVM();
     //}
 
+
   return true;
 }
 
@@ -1019,7 +1020,14 @@ void regionCFG::insertPhis()  {
   /* find blocks where registers are "defined" */
   getRegDefBlocks();
   /* if any register is written in the cfg */
-  for(size_t gpr = 0; gpr < 32; gpr++) {
+  assert(gprDefinitionBlocks[0].empty());
+  for(size_t gpr = 1; gpr < 32; gpr++) {
+    //if(gpr == 16) {
+    //for(auto blk : gprDefinitionBlocks[gpr]) {
+    //std::cout << *blk << "\n";
+    //}
+    //}
+    
     if(!gprDefinitionBlocks[gpr].empty())
       gprDefinitionBlocks[gpr].insert(entryBlock);
   }
@@ -1496,7 +1504,8 @@ basicBlock* regionCFG::run(state_t *ss) {
   globals::currUnit = this;
   uint64_t nextbb = 0;
   uint64_t i0=ss->icnt;
-  std::cout << "run region starting at pc " << std::hex << ss->pc << std::dec << "\n";
+  //std::cout << "run region starting at pc " << std::hex << ss->pc << std::dec << "\n";
+  
   codeBits(
 	   &(ss->pc), 
 	   ss->gpr,
@@ -1505,9 +1514,12 @@ basicBlock* regionCFG::run(state_t *ss) {
 	   &(ss->abortloc),
 	   &nextbb
 	   );
+
   globals::cBB = reinterpret_cast<basicBlock*>(ss->abortloc);
+  //std::cout << "abortpc " << std::hex << globals::cBB->getEntryAddr() << std::dec << "\n";
+  
   i0 = ss->icnt - i0;
-  std::cout << "ran " << i0 << " insns\n";
+  //std::cout << "ran " << i0 << " insns\n";
   minIcnt = std::min(minIcnt, i0);
   maxIcnt = std::max(maxIcnt, i0);
   runHistory[runs%histoLen] = i0;

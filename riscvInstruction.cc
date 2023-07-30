@@ -203,7 +203,7 @@ llvm::Value *Insn::byteSwap(llvm::Value *v) {
 }
 
 void Insn::emitPrintPC() {
-#if 0
+#if 1
   llvm::LLVMContext &cxt = *(cfg->Context);
   llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
   llvm::Value *vAddr = llvm::ConstantInt::get(iType32,addr);
@@ -723,8 +723,7 @@ bool insn_lhu::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
   llvm::Value *vPtr = cfg->myIRBuilder->CreateBitCast(vGEP, llvm::Type::getInt16PtrTy(cxt));
   std::string loadName = "lhu_" + std::to_string(cfg->getuuid()++) + "_" + toStringHex(addr);
   llvm::Value *vLoad = cfg->myIRBuilder->CreateLoad(vPtr,loadName);
-  llvm::Value *vSext = cfg->myIRBuilder->CreateZExt(byteSwap(vLoad), iType32);
-  regTbl.gprTbl[r.l.rd] = vSext;
+  regTbl.gprTbl[r.l.rd] = cfg->myIRBuilder->CreateZExt(vLoad, iType32);
   return false;
 }
 
@@ -741,34 +740,9 @@ bool insn_lw::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
   llvm::Value *vGEP = cfg->myIRBuilder->CreateGEP(vMem, vZEA);
   llvm::Value *vPtr = cfg->myIRBuilder->CreateBitCast(vGEP, llvm::Type::getInt32PtrTy(*(cfg->Context)));
   std::string loadName = "lw_" + std::to_string(cfg->getuuid()++) + "_" + toStringHex(addr);
-  llvm::Value *vLoad = cfg->myIRBuilder->CreateLoad(vPtr,loadName);
-  regTbl.gprTbl[r.l.rd] = byteSwap(vLoad);
+  regTbl.gprTbl[r.l.rd] = cfg->myIRBuilder->CreateLoad(vPtr,loadName); 
   return false;
 }
-
-// bool insn_slti::generateIR(cfgBasicBlock *cBB,   llvmRegTables& regTbl) {
-//   llvm::LLVMContext &cxt = *(cfg->Context);
-//   llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-//   llvm::Value *vImm = llvm::ConstantInt::get(iType32,simm);
-//   llvm::Value *vZ = llvm::ConstantInt::get(iType32,0);
-//   llvm::Value *vO = llvm::ConstantInt::get(iType32,1);
-//   llvm::Value *vRS = regTbl.gprTbl[rs];
-//   llvm::Value *vCMP = cfg->myIRBuilder->CreateICmpSLT(vRS, vImm);
-//   regTbl.gprTbl[rt] = cfg->myIRBuilder->CreateSelect(vCMP, vO, vZ);
-//   return false;
-// }
-
-// bool insn_sltiu::generateIR(cfgBasicBlock *cBB,   llvmRegTables& regTbl) {
-//   llvm::LLVMContext &cxt = *(cfg->Context);
-//   llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
-//   llvm::Value *vImm = llvm::ConstantInt::get(iType32,simm);
-//   llvm::Value *vZ = llvm::ConstantInt::get(iType32,0);
-//   llvm::Value *vO = llvm::ConstantInt::get(iType32,1);
-//   llvm::Value *vRS = regTbl.gprTbl[rs];
-//   llvm::Value *vCMP = cfg->myIRBuilder->CreateICmpULT(vRS, vImm);
-//   regTbl.gprTbl[rt] = cfg->myIRBuilder->CreateSelect(vCMP, vO, vZ);
-//   return false;
-// }
 
 bool insn_bltu::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
   llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
@@ -833,17 +807,12 @@ bool insn_j::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
 
 bool insn_jal::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {  
   llvm::LLVMContext &cxt = *(cfg->Context);
-  regTbl.gprTbl[31] = llvm::ConstantInt::get(llvm::Type::getInt32Ty(cxt),(addr+8));
+  uint32_t rd = (inst>>7) & 31;
+  assert(rd != 0);
+  regTbl.gprTbl[rd] = llvm::ConstantInt::get(llvm::Type::getInt32Ty(cxt),(addr+4));
   cfgBasicBlock *nBB = *(cBB->succs.begin());
-#if 0
-  if(cBB->succs.size() != 1) {
-    printf("not 1 succ in a jal (%zu succs)\n", cBB->succs.size());
-    exit(-1);
-  }
-#endif
   cfg->myIRBuilder->CreateBr(nBB->lBB);
   cBB->hasTermBranchOrJump = true;
-
   return true;
 }
 
@@ -900,7 +869,7 @@ bool insn_jalr::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
   llvm::LLVMContext &cxt = *(cfg->Context);
   llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
 
-  regTbl.gprTbl[31] = llvm::ConstantInt::get(llvm::Type::getInt32Ty(cxt),(addr+8));
+  regTbl.gprTbl[r.jj.rd] = llvm::ConstantInt::get(llvm::Type::getInt32Ty(cxt),(addr+4));
 
   std::vector<llvm::BasicBlock*> fallT(cBB->succs.size() + 1);
   std::vector<llvm::Value*> cmpz;
