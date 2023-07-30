@@ -402,6 +402,7 @@ void cfgBasicBlock::bindInsns(regionCFG *cfg) {
 
   for(const auto & p : rawInsns) {
     Insn *ins = getInsn(p.first, p.second);
+    assert(ins);
     ins->set(cfg,this);
     insns.push_back(ins);
   }
