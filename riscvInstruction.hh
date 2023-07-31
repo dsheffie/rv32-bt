@@ -116,6 +116,16 @@ class insn_j : public Insn {
 public:
   insn_j(uint32_t inst, uint32_t addr) :
     Insn(inst, addr, insnDefType::no_dest) {}
+  int32_t getJumpAddr() const {
+    int32_t jaddr =
+      (r.j.imm10_1 << 1)   |
+      (r.j.imm11 << 11)    |
+      (r.j.imm19_12 << 12) |
+      (r.j.imm20 << 20);
+    jaddr |= ((inst>>31)&1) ? 0xffe00000 : 0x0;
+    jaddr += addr;
+    return jaddr;
+  }
   bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override {}
   void recUses(cfgBasicBlock *cBB) override {}
@@ -125,6 +135,16 @@ class insn_jal : public Insn {
 public:
   insn_jal(uint32_t inst, uint32_t addr) :
     Insn(inst, addr, insnDefType::gpr) {}
+  int32_t getJumpAddr() const {
+    int32_t jaddr =
+      (r.j.imm10_1 << 1)   |
+      (r.j.imm11 << 11)    |
+      (r.j.imm19_12 << 12) |
+      (r.j.imm20 << 20);
+    jaddr |= ((inst>>31)&1) ? 0xffe00000 : 0x0;
+    jaddr += addr;
+    return jaddr;
+  }  
   bool generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) override;
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override;
   void recUses(cfgBasicBlock *cBB) override {}

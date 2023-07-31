@@ -1517,7 +1517,7 @@ basicBlock* regionCFG::run(state_t *ss) {
 
   globals::cBB = reinterpret_cast<basicBlock*>(ss->abortloc);
   //std::cout << "abortpc " << std::hex << globals::cBB->getEntryAddr() << std::dec << "\n";
-  
+  //std::cout << "pc = " << std::hex << ss->pc << "\n";
   i0 = ss->icnt - i0;
   //std::cout << "ran " << i0 << " insns\n";
   minIcnt = std::min(minIcnt, i0);

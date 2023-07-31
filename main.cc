@@ -74,9 +74,7 @@ std::map<uint32_t, basicBlock*> basicBlock::insMap;
 std::map<uint32_t, uint64_t> basicBlock::insInBBCnt;
 
 
-#if ((LLVM_VERSION_MAJOR==3 && LLVM_VERSION_MINOR > 8) || (LLVM_VERSION_MAJOR > 3))
 llvm::LLVMContext globalContext;
-#endif
 
 
 /* Locals */

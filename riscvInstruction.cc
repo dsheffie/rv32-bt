@@ -558,6 +558,18 @@ bool rTypeInsn::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
     case 0x5:
       switch(r.r.special)
 	{
+	case 0x0:
+	  vRD = cfg->myIRBuilder->CreateAnd(regTbl.gprTbl[r.r.rs2], vM5);
+	  vRD = cfg->myIRBuilder->CreateLShr(regTbl.gprTbl[r.r.rs1], vRD);
+	  break;
+	case 0x1: {
+	  llvm::Value *vOne = llvm::ConstantInt::get(iType32,1);
+	  llvm::Value *vZero = llvm::ConstantInt::get(iType32,0);
+	  llvm::Value *vCmp = cfg->myIRBuilder->CreateICmpEQ(regTbl.gprTbl[r.r.rs2], vZero);
+	  llvm::Value *vDivider = cfg->myIRBuilder->CreateSelect(vCmp, vOne, regTbl.gprTbl[r.r.rs2]);
+	  vRD = cfg->myIRBuilder->CreateUDiv(regTbl.gprTbl[r.r.rs1], vDivider);
+	  break;
+	}
 	default:
 	  die();
 	}
@@ -578,6 +590,14 @@ bool rTypeInsn::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
 	case 0x0:
 	  vRD = cfg->myIRBuilder->CreateAnd(regTbl.gprTbl[r.r.rs1], regTbl.gprTbl[r.r.rs2]);
 	  break;
+	case 0x1: {
+	  llvm::Value *vOne = llvm::ConstantInt::get(iType32,1);
+	  llvm::Value *vZero = llvm::ConstantInt::get(iType32,0);
+	  llvm::Value *vCmp = cfg->myIRBuilder->CreateICmpEQ(regTbl.gprTbl[r.r.rs2], vZero);
+	  llvm::Value *vDivider = cfg->myIRBuilder->CreateSelect(vCmp, vOne, regTbl.gprTbl[r.r.rs2]);
+	  vRD = cfg->myIRBuilder->CreateURem(regTbl.gprTbl[r.r.rs1], vDivider);
+	  break;
+	}	  
 	default:
 	  die();
 	}
