@@ -762,27 +762,7 @@ bool regionCFG::buildCFG(std::vector<std::vector<basicBlock*> > &regions) {
   }
 
 
-  std::list<cfgBasicBlock*> likelyBlockList;
-  for(size_t i = 0; i < cfgBlocks.size(); i++) {
-    cfgBasicBlock *cbb = cfgBlocks[i];
-    //if(cbb->hasBranchLikely()) {
-    if(cbb->haslikely()) {
-      likelyBlockList.push_back(cbb);
-    }
-  }
 
-  while(not(likelyBlockList.empty())) {
-    cfgBasicBlock *cbb = likelyBlockList.front();
-    likelyBlockList.pop_front();
-    cfgBasicBlock *pbb = new cfgBasicBlock(cbb->bb, true);
-    pbb->bindInsns(this);
-    if(cbb->patchLikely(this, pbb)) {
-      cfgBlocks.push_back(pbb);
-    }
-    else {
-      delete pbb;
-    }
-  }
   if(not(allBlocksReachable(cfgMap[head]))) {
     die();
   }
@@ -803,7 +783,7 @@ bool regionCFG::buildCFG(std::vector<std::vector<basicBlock*> > &regions) {
 }
 
 bool regionCFG::analyzeGraph() {
-  entryBlock = new cfgBasicBlock(nullptr, false);
+  entryBlock = new cfgBasicBlock(nullptr);
   cfgBlocks.push_back(entryBlock);
   entryBlock->addSuccessor(cfgHead);
   globals::nCfgCompiles++;

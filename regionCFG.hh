@@ -174,7 +174,6 @@ class cfgBasicBlock {
   friend std::ostream &operator<<(std::ostream &out, const cfgBasicBlock &bb);
   friend class regionCFG;
   basicBlock *bb;
-  bool isLikelyPatch;
   bool hasTermBranchOrJump;
   llvmRegTables termRegTbl;
   llvm::BasicBlock *lBB;
@@ -215,7 +214,6 @@ class cfgBasicBlock {
   bool checkIfPlausableSuccessors();
   void addWithInCFGEdges(regionCFG *cfg);
   bool has_jr_jalr();
-  bool haslikely();
   bool canCompile() const;
   bool hasFloatingPoint(uint32_t *typeCnts) const;
   void print();
@@ -234,10 +232,9 @@ class cfgBasicBlock {
   bool hasBranchLikely() {
     return false;
   }
-  bool patchLikely(regionCFG *cfg, cfgBasicBlock *pbb);
   void addSuccessor(cfgBasicBlock *s);
   void delSuccessor(cfgBasicBlock *s);
-  cfgBasicBlock(basicBlock *bb, bool isLikelyPatch=false);
+  cfgBasicBlock(basicBlock *bb);
   ~cfgBasicBlock();
   void updateFPRTouched(uint32_t reg, fprUseEnum useType);
   const std::set<cfgBasicBlock*> &getPreds() const {

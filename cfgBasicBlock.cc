@@ -177,20 +177,6 @@ bool cfgBasicBlock::has_jr_jalr() {
   return false;
 }
 
-bool cfgBasicBlock::haslikely() {
-  for(size_t i = 0; i < insns.size(); i++) {
-    Insn *ins = insns[i];
-    if(ins->isLikelyBranch()) {
-      if(!hasBranchLikely()) {
-	printf("mismatch in block about likely!!\n");
-	print();
-	exit(-1);
-      }
-      return true;
-    }
-  }
-  return false;
-}
 
 bool cfgBasicBlock::hasFloatingPoint(uint32_t *typeCnts) const {
   bool hasFP = false;
@@ -221,8 +207,6 @@ std::string cfgBasicBlock::getName() const {
 }
 
 std::ostream &operator<<(std::ostream &out, const cfgBasicBlock &bb) {
-  if(bb.isLikelyPatch) 
-    out << "isLikelyPatch...\n";
   out << "Successors of block: ";
   for(auto cBB : bb.succs) {
     if(!cBB->insns.empty()) {
@@ -256,36 +240,8 @@ void cfgBasicBlock::print() {
 
 
 
-bool cfgBasicBlock::patchLikely(regionCFG *cfg, cfgBasicBlock *pbb) {
-  auto brInsn = dynamic_cast<abstractBranch*>(insns[insns.size()-1]);
-  if(brInsn==nullptr) {
-    printf("couldn't access branch instruction!\n");
-    exit(-1);
-  }
-  uint32_t takenAddr = brInsn->getTakenAddr();
-  bool patched = false;
-  for(auto cbb : succs) {
-    uint32_t nEntryAddr = cbb->getEntryAddr();
-    if(nEntryAddr == takenAddr) {
-      delSuccessor(cbb);
-      addSuccessor(pbb);
-      pbb->addSuccessor(cbb);
-      patched = true;
-      //printf("CREATED PATCH FOR %x\n", getEntryAddr());
-      break;
-    }
-  }
-  if(!patched) {
-    /*predicting opposite of likely encoding */
-    addSuccessor(pbb);
-    patched = true;
-  }
-
-  return patched;
-}
 
 cfgBasicBlock* cfgBasicBlock::splitBB(uint32_t splitpc) {
-  assert(not(isLikelyPatch));
   ssize_t offs = -1;
 #if 0
   std::cout << "old:\n";
@@ -296,7 +252,7 @@ cfgBasicBlock* cfgBasicBlock::splitBB(uint32_t splitpc) {
   }
 #endif
   
-  cfgBasicBlock *sbb = new cfgBasicBlock(bb, false);
+  cfgBasicBlock *sbb = new cfgBasicBlock(bb);
   sbb->rawInsns.clear();
   sbb->hasTermBranchOrJump = hasTermBranchOrJump;
 
@@ -362,8 +318,8 @@ cfgBasicBlock* cfgBasicBlock::splitBB(uint32_t splitpc) {
   return sbb;
 }
 
-cfgBasicBlock::cfgBasicBlock(basicBlock *bb, bool isLikelyPatch) :
-  bb(bb), isLikelyPatch(isLikelyPatch),
+cfgBasicBlock::cfgBasicBlock(basicBlock *bb) :
+  bb(bb),
   hasTermBranchOrJump(false),
   lBB(nullptr),
   idombb(nullptr) {
@@ -377,14 +333,9 @@ cfgBasicBlock::cfgBasicBlock(basicBlock *bb, bool isLikelyPatch) :
 
   if(bb) {
     ssize_t numInsns = bb->getVecIns().size();
-    if(isLikelyPatch) {
-      rawInsns.push_back(bb->getVecIns()[numInsns-1]);
-    }
-    else {
-      for(ssize_t i = 0; i < numInsns; i++) {
+    for(ssize_t i = 0; i < numInsns; i++) {
 	const basicBlock::insPair &p = bb->getVecIns()[i];
 	rawInsns.push_back(p);
-      }
     }
   }
 }
@@ -594,21 +545,9 @@ void cfgBasicBlock::traverseAndRename(regionCFG *cfg, llvmRegTables prevRegTbl) 
     uint32_t npc = getExitAddr() + 4;
 
     llvm::BasicBlock *nBB = 0;
-    if(isLikelyPatch) {
-      if(succs.empty()) {
-	cfgBasicBlock *pBB = (*preds.begin());
-	auto *lBranch = dynamic_cast<abstractBranch*>(pBB->insns[pBB->insns.size()-1]);
-	assert(lBranch!=nullptr);
-	nBB = cfg->generateAbortBasicBlock(lBranch->getTakenAddr(), regTbl, this, 0);
-      }
-      else {
-	nBB = (*(succs.begin()))->lBB;
-      }
-    }
-    else {
-      nBB = getSuccLLVMBasicBlock(npc);
-      nBB = cfg->generateAbortBasicBlock(npc, regTbl, this, nBB);
-    }
+    nBB = getSuccLLVMBasicBlock(npc);
+    nBB = cfg->generateAbortBasicBlock(npc, regTbl, this, nBB);
+
     cfg->myIRBuilder->SetInsertPoint(lBB);
     //print();
     cfg->myIRBuilder->CreateBr(nBB);
