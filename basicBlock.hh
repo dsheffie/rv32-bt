@@ -139,21 +139,7 @@ public:
   void addToCFGRegions(basicBlock *bb) {
     cfgInRegions.insert(bb);
   }
-  bool sanityCheck() {
-    for(const auto sbb : succs) {
-      auto it = sbb->preds.find(this);
-      if(it == sbb->preds.end()) {
-	return false;
-      }
-    }
-    for(const auto pbb : preds) {
-      auto it = pbb->succs.find(this);
-      if(it == pbb->preds.end()) {
-	return false;
-      }
-    }
-    return true;
-  }
+  bool sanityCheck();
   
   static void toposort(basicBlock *src, const std::set<basicBlock*> &valid, std::list<basicBlock*> &ordered);
 };

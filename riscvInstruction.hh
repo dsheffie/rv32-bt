@@ -27,8 +27,6 @@ protected:
   cfgBasicBlock *myBB = nullptr;
   
 public:
-  llvm::Value *byteSwap(llvm::Value *v);
-
   void saveInstAddress();
   void set(regionCFG *cfg, cfgBasicBlock *cBB);
   void emitPrintPC();

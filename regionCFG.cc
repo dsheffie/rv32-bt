@@ -566,6 +566,7 @@ bool regionCFG::buildCFG(std::vector<std::vector<basicBlock*> > &regions) {
       blocks.insert(bb);
     }
   }
+
   
   if(heads.size()!=1) {
     printf("something has gone horribly wrong: %zu region heads in cfg\n", 
@@ -592,7 +593,7 @@ bool regionCFG::buildCFG(std::vector<std::vector<basicBlock*> > &regions) {
   }
   std::sort(blockvec.begin(), blockvec.end(), sortByIcnt<basicBlock*>());
   
-  
+  globals::cfgAug = cfgAugEnum::insane;
   switch(globals::cfgAug)
     {
     case cfgAugEnum::none:
@@ -647,6 +648,9 @@ bool regionCFG::buildCFG(std::vector<std::vector<basicBlock*> > &regions) {
   int added_blocks = 0;
   for(auto dbb : discovered) {
     if(blocks.find(dbb) != blocks.end()) {
+      if(dbb->getEntryAddr() == 0x80000dfc) {
+	std::cout << "found dfc bb\n";
+      }
       ++added_blocks;
     }
     blocks.insert(dbb);
@@ -872,10 +876,10 @@ bool regionCFG::analyzeGraph() {
     die();
   }
 
-  //if(globals::dumpIR) {
+  if(globals::dumpIR || true) {
     dumpIR();
     dumpLLVM();
-    //}
+  }
 
 
   return true;
@@ -1504,6 +1508,7 @@ basicBlock* regionCFG::run(state_t *ss) {
   globals::currUnit = this;
   uint64_t nextbb = 0;
   uint64_t i0=ss->icnt;
+
   //std::cout << "run region starting at pc " << std::hex << ss->pc << std::dec << "\n";
   
   codeBits(

@@ -760,3 +760,19 @@ bool basicBlock::hasTermDirectBranchOrJump(uint32_t &target, uint32_t &fallthru)
   
 }
 
+bool basicBlock::sanityCheck() {
+  
+    for(const auto sbb : succs) {
+      auto it = sbb->preds.find(this);
+      if(it == sbb->preds.end()) {
+	return false;
+      }
+    }
+    for(const auto pbb : preds) {
+      auto it = pbb->succs.find(this);
+      if(it == pbb->preds.end()) {
+	return false;
+      }
+    }
+    return true;
+  }
