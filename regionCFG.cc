@@ -675,6 +675,10 @@ bool regionCFG::buildCFG(std::vector<std::vector<basicBlock*> > &regions) {
   }
   headProb = regionProb.at(head);
 
+  for(auto bb : blocks) {
+    assert(bb->sanityCheck());
+  }  
+  
   if(globals::splitCFGBBs) {
     for(auto bb : blocks) {
       bb->repairBrokenEdges();

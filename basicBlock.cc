@@ -253,11 +253,6 @@ basicBlock *basicBlock::split(uint32_t nEntryAddr) {
   hasjr = hasjal = hasjalr = hasmonitor = false;
   setReadOnly();
 
-  hasTermBranchOrJump = false;
-  if( branchLikely ) {
-    nBB->branchLikely = true;
-    branchLikely = false;
-  }
   nBB->inscnt = inscnt;
   nBB->setReadOnly(); 
   

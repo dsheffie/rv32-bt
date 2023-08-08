@@ -6,10 +6,6 @@
 #include "helper.hh"
 #include "globals.hh"
 
-#include "mips.hh"
-
-using namespace mips;
-
 typedef llvm::Value lv_t;
 
 std::ostream &operator<<(std::ostream &out, const Insn &ins) {

@@ -45,10 +45,9 @@ private:
   bool isCompiled = false, hasRegion = false;
   std::map<uint32_t, uint32_t> bbRegionCounts; 
   std::vector <std::vector<basicBlock*>>bbRegions;
-  bool hasTermBranchOrJump = false;
   regionCFG *cfgCplr = nullptr;
   uint32_t termAddr=0;
-  bool readOnly=false, branchLikely=false;
+  bool readOnly=false;
   bool hasjr=false, hasjal=false, hasjalr = false, hasmonitor=false;
   uint64_t totalEdges = 0;
   insContainer vecIns;
@@ -99,8 +98,9 @@ public:
     return termAddr;
   }
   void setTermAddr( uint32_t termAddr) {
-    if(this->termAddr == 0)
+    if(this->termAddr == 0) {
       this->termAddr = termAddr;
+    }
   }
   const insContainer &getVecIns() const {
     return vecIns;
