@@ -870,7 +870,7 @@ bool regionCFG::analyzeGraph() {
     die();
   }
 
-  if(globals::dumpIR || true) {
+  if(globals::dumpIR ) {
     dumpIR();
     dumpLLVM();
   }
