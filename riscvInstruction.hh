@@ -95,8 +95,7 @@ public:
   void recDefines(cfgBasicBlock *cBB, regionCFG *cfg) override ;
   void recUses(cfgBasicBlock *cBB) override;
   virtual bool handleBranch(cfgBasicBlock *cBB, llvmRegTables& regTbl,
-			    llvm::CmpInst::Predicate branchPred,
-			    llvm::Value *vRT, llvm::Value *vRS);
+			    llvm::Value *vCMP);
 };
 
 

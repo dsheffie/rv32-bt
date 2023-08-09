@@ -237,9 +237,8 @@ void insn_jr::recUses(cfgBasicBlock *cBB) {
 
 bool iBranchTypeInsn::handleBranch(cfgBasicBlock *cBB,
 				   llvmRegTables& regTbl,
-				   llvm::CmpInst::Predicate branchPred,
-				   llvm::Value *vRT, llvm::Value *vRS) {
-  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmp(branchPred, vRS, vRT);
+				   llvm::Value *vCMP) {
+
 
 
   llvm::BasicBlock *tBB = cBB->getSuccLLVMBasicBlock(tAddr);
@@ -247,19 +246,9 @@ bool iBranchTypeInsn::handleBranch(cfgBasicBlock *cBB,
   if(tAddr != ntAddr) {
     llvm::BasicBlock *t0 = cfg->generateAbortBasicBlock(tAddr, regTbl,cBB,tBB,addr);
     llvm::BasicBlock *t1 = ntBB = cfg->generateAbortBasicBlock(ntAddr,regTbl,cBB,ntBB,addr);
-    bool tIsAbort = not(tBB == t0);
     tBB = t0;
     ntBB = t1;
-    llvm::Instruction *TI = cfg->myIRBuilder->CreateCondBr(vCMP, tBB, ntBB);
-#if 1
-    llvm::MDBuilder MDB(globalContext);
-    llvm::MDNode *Node = nullptr;
-    if(tIsAbort)
-      Node  = MDB.createBranchWeights(5,95);
-    else
-      Node  = MDB.createBranchWeights(95,5);
-    TI->setMetadata(llvm::LLVMContext::MD_prof, Node);
-#endif
+    cfg->myIRBuilder->CreateCondBr(vCMP, tBB, ntBB);
   }
   else {
     tBB = cfg->generateAbortBasicBlock(tAddr, regTbl,cBB,tBB,addr);
@@ -748,41 +737,35 @@ bool insn_lw::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
 }
 
 bool insn_bltu::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
-  llvm::Value *vRS = regTbl.gprTbl[r.r.rs2];
-  return handleBranch(cBB, regTbl,llvm::CmpInst::ICMP_ULT, vRT, vRS);
+  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmp(llvm::CmpInst::ICMP_ULT, regTbl.gprTbl[r.b.rs1], regTbl.gprTbl[r.b.rs2]);
+  return handleBranch(cBB, regTbl,vCMP);
 }
 
 bool insn_blt::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
-  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
-  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_SLT, vRT, vRS);
+  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmp(llvm::CmpInst::ICMP_SLT, regTbl.gprTbl[r.b.rs1], regTbl.gprTbl[r.b.rs2]);  
+  return handleBranch(cBB,regTbl,vCMP);
 }
 
 bool insn_bne::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
-  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
-  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_NE,vRT,vRS);
+  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmp(llvm::CmpInst::ICMP_NE, regTbl.gprTbl[r.b.rs1], regTbl.gprTbl[r.b.rs2]);    
+  return handleBranch(cBB,regTbl,vCMP);
 }
 
 
 bool insn_beq::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
-  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
-  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_EQ, vRT, vRS);
+  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmp(llvm::CmpInst::ICMP_EQ, regTbl.gprTbl[r.b.rs1], regTbl.gprTbl[r.b.rs2]);      
+  return handleBranch(cBB,regTbl,vCMP);
 }
 
 
 bool insn_bge::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
-  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
-  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_SGE,vRT,vRS);
+  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmp(llvm::CmpInst::ICMP_SGE, regTbl.gprTbl[r.b.rs1], regTbl.gprTbl[r.b.rs2]);        
+  return handleBranch(cBB,regTbl,vCMP);
 }
 
 bool insn_bgeu::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  llvm::Value *vRT = regTbl.gprTbl[r.b.rs1];
-  llvm::Value *vRS = regTbl.gprTbl[r.b.rs2];
-  return handleBranch(cBB,regTbl,llvm::CmpInst::ICMP_UGE,vRT,vRS);
+  llvm::Value *vCMP = cfg->myIRBuilder->CreateICmp(llvm::CmpInst::ICMP_UGE, regTbl.gprTbl[r.b.rs1], regTbl.gprTbl[r.b.rs2]);          
+  return handleBranch(cBB,regTbl,vCMP);
 }
 
 

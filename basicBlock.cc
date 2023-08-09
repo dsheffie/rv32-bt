@@ -748,9 +748,6 @@ bool basicBlock::hasTermDirectBranchOrJump(uint32_t &target, uint32_t &fallthru)
   size_t ni = vecIns.size();
   assert(ni != 0);
   fallthru = vecIns.at(ni-1).second + 4;
-  if(ni < 2) {
-    return false;
-  }
   return isDirectBranchOrJump(vecIns.at(ni-1).first, vecIns.at(ni-1).second, target);
   
 }
