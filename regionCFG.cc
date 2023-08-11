@@ -888,11 +888,7 @@ void regionCFG::initLLVMAndGeneratePreamble() {
   std::string modName = tempName + "_module";
   std::string entryName = tempName + "_entry";
 
-#if (LLVM_VERSION_MAJOR==3 && LLVM_VERSION_MINOR < 9)
-  Context = &(llvm::getGlobalContext());
-#else
   Context = &globalContext;
-#endif
   myIRBuilder = new llvm::IRBuilder<>(*Context);
   myModule = new llvm::Module(modName, *Context);
   type_iPtr32 = llvm::Type::getInt32PtrTy(*Context);

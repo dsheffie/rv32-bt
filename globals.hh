@@ -51,11 +51,10 @@ namespace globals {
 #endif
 }
 
-#if ((LLVM_VERSION_MAJOR==3 && LLVM_VERSION_MINOR > 8) || LLVM_VERSION_MAJOR > 3)
 #ifndef ELIDE_LLVM
 extern llvm::LLVMContext globalContext;
 #endif
-#endif
+
 
 
 #endif

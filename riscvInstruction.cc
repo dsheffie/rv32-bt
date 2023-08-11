@@ -544,6 +544,11 @@ bool rTypeInsn::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
 	  vRD = cfg->myIRBuilder->CreateUDiv(regTbl.gprTbl[r.r.rs1], vDivider);
 	  break;
 	}
+	case 0x20:
+	  vRD = cfg->myIRBuilder->CreateAnd(regTbl.gprTbl[r.r.rs2], vM5);
+	  vRD = cfg->myIRBuilder->CreateAShr(regTbl.gprTbl[r.r.rs1], vRD);
+	  break;
+	  
 	default:
 	  die();
 	}

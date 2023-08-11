@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
   static_assert(sizeof(riscv_t)==4, "mips union borked");
   namespace po = boost::program_options; 
   std::cerr << KGRN
-	    << "MIPS BT : built "
+	    << "RISCV32 BT : built "
 	    << __DATE__ << " " << __TIME__
 	    << ",hostname="<<gethostname()
 	    << ",pid="<< getpid() << "\n"
@@ -133,9 +133,6 @@ int main(int argc, char *argv[]) {
   llvm::InitializeNativeTargetAsmPrinter(); 
   llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR < 5
-  llvm::llvm_start_multithreaded(); 
-#endif
 
   char **sysArgv = nullptr;
   int sysArgc = 0;
