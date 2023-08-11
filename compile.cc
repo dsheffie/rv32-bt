@@ -42,7 +42,7 @@ bool compile::canCompileInstr(uint32_t inst) {
     }
     break;
     case 0x73:
-      std::cout << "opcode stops bt " << std::hex << opcode << std::dec << "\n";
+      //std::cout << "opcode stops bt " << std::hex << opcode << std::dec << "\n";
       rc = false;
       break;
     

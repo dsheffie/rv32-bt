@@ -856,7 +856,6 @@ bool insn_jr::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
 }
 
 bool insn_jalr::generateIR(cfgBasicBlock *cBB,  llvmRegTables& regTbl) {
-  assert(0);
   llvm::LLVMContext &cxt = *(cfg->Context);
   llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
 
