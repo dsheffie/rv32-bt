@@ -58,6 +58,7 @@ private:
   void toposort(const std::set<basicBlock*> &valid, std::list<basicBlock*> &ordered, std::set<basicBlock*> &visited);
 public:
   static void dropAllBBs();
+  static void dumpCFG();
   void report(std::string &s, uint64_t icnt) override;
   void info() override;
   basicBlock* run(state_t *s) override;

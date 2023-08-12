@@ -34,6 +34,7 @@ namespace globals {
   extern bool enableBoth;
   extern uint32_t enoughRegions;
   extern bool dumpIR;
+  extern bool dumpCFG;
   extern bool splitCFGBBs;
   extern std::string blobName;
   extern uint64_t icountMIPS;

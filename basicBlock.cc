@@ -9,6 +9,8 @@
 #include <string>
 #include <cstdlib>
 #include <cstdio>
+#include <ostream>
+#include <fstream>
 #include <functional>
 
 #include "globals.hh"
@@ -17,7 +19,6 @@
 uint64_t basicBlock::cfgCnt = 0;
 
 bool basicBlock::hasJR(bool isRet) const {
-
     if(isRet) {
       for(const auto & p : vecIns) {
 	if(is_jr(p.first)) {
@@ -98,6 +99,15 @@ void basicBlock::repairBrokenEdges() {
   }
 
   
+}
+
+void basicBlock::dumpCFG() {
+  std::ofstream out("cfg.txt");
+  for(auto &p : bbMap) {
+    basicBlock *bb = p.second;
+    out << *bb;
+  }
+  out.close();
 }
 
 void basicBlock::dropAllBBs() {

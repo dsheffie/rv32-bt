@@ -559,6 +559,14 @@ bool rTypeInsn::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
 	case 0x0:
 	  vRD = cfg->myIRBuilder->CreateOr(regTbl.gprTbl[r.r.rs1], regTbl.gprTbl[r.r.rs2]);
 	  break;
+	case 0x1: {
+	  llvm::Value *vOne = llvm::ConstantInt::get(iType32,1);
+	  llvm::Value *vZero = llvm::ConstantInt::get(iType32,0);
+	  llvm::Value *vCmp = cfg->myIRBuilder->CreateICmpEQ(regTbl.gprTbl[r.r.rs2], vZero);
+	  llvm::Value *vDivider = cfg->myIRBuilder->CreateSelect(vCmp, vOne, regTbl.gprTbl[r.r.rs2]);
+	  vRD = cfg->myIRBuilder->CreateSRem(regTbl.gprTbl[r.r.rs1], vDivider);	  
+	  break;
+	}
 	default:
 	  die();
 	}

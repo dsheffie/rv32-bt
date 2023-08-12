@@ -49,6 +49,7 @@ namespace globals {
   bool enableBoth = true;
   uint32_t enoughRegions = 5;
   bool dumpIR = false;
+  bool dumpCFG = false;
   bool splitCFGBBs = true;
   uint64_t nFuses = 0;
   uint64_t nAttemptedFuses = 0;
@@ -176,8 +177,8 @@ int main(int argc, char *argv[]) {
    ("splitCFGBBs",po::value<bool>(&globals::splitCFGBBs)->default_value(false), "split CFG basicblocks")
    ("blobName", po::value<std::string>(&globals::blobName)->default_value("blob.bin"), "binary blob name")
    ("icountMIPS", po::value<uint64_t>(&globals::icountMIPS)->default_value(500), "millions of of instructions per second for time calculation")
-   ("dumpIR",po::value<bool>(&globals::dumpIR)->default_value(false), "dump IR");
-    
+   ("dumpIR",po::value<bool>(&globals::dumpIR)->default_value(false), "dump IR")
+   ("dumpCFG",po::value<bool>(&globals::dumpCFG)->default_value(false), "dump CFG");
   try {
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm); 
@@ -353,7 +354,11 @@ int main(int argc, char *argv[]) {
       freport.close();
     }    
   }
-
+  
+  if(globals::dumpCFG) {
+    basicBlock::dumpCFG();
+  }
+  
   basicBlock::dropAllBBs();
   delete globals::regionFinder;
   
