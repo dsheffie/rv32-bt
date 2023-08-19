@@ -144,7 +144,22 @@ void basicBlock::setReadOnly() {
 
 
 
+bool basicBlock::fallsThru() const {
+  return not(isBranchOrJump(vecIns.at(getNumIns()-1).first));
+}
+
+
 void basicBlock::addSuccessor(basicBlock *bb) {
+  if(succs.find(bb) != succs.end())
+    return;
+  
+  if(fallsThru() and succs.size() >= 1) {
+    std::cout << "can not have more than one successor with fall-thru\n";
+    std::cout << *this;
+    std::cout << *bb;
+    die();
+  }
+  
   succs.insert(bb);
   succsMap[bb->entryAddr] = bb;
   bb->preds.insert(this);
@@ -195,6 +210,7 @@ void basicBlock::dropCompiledCode() {
   bbRegions.clear();
   bbRegionCounts.clear();
   for(basicBlock *nukeBB : cfgInRegions){
+    //std::cout << "delete region " << std::hex << nukeBB->getEntryAddr() << std::dec << "\n";
     if(nukeBB->cfgCplr) {
       delete nukeBB->cfgCplr;
       nukeBB->cfgCplr = nullptr;
@@ -212,18 +228,11 @@ basicBlock *basicBlock::split(uint32_t nEntryAddr) {
 	    << std::endl;
 #endif
   size_t offs = (nEntryAddr-entryAddr) >> 2;
-  bool splitAtLastInst = (offs == (vecIns.size()-1)) and isBranchOrJump(vecIns.at(offs-1).first);
   
   globals::regionFinder->disableRegionCollection();
   dropCompiledCode();
 
   basicBlock *nBB = new basicBlock(nEntryAddr);
-  if(splitAtLastInst) {
-    nBB->addIns(vecIns.at(offs).first, vecIns.at(offs).second);
-    nBB->setReadOnly();
-    nBB->termAddr = nEntryAddr;
-    return nBB;
-  }
   
 
   //unlink old successors and update with new block
@@ -264,7 +273,12 @@ basicBlock *basicBlock::split(uint32_t nEntryAddr) {
   setReadOnly();
 
   nBB->inscnt = inscnt;
-  nBB->setReadOnly(); 
+  nBB->setReadOnly();
+  
+  if(entryAddr == 0x80009dd8) {
+    std::cout << *this;
+    std::cout << *nBB;
+  }
   
   return nBB;
 }
@@ -429,7 +443,7 @@ bool basicBlock::executeJIT(state_t *s) {
     return false;
   }
   
-  if(/*not(globals::replay) and*/ globals::regionFinder->update(this)) {
+  if(globals::regionFinder->update(this)) {
     globals::regionFinder->getRegion(bbRegion);
     gotRegion = true;    
     for(size_t i = 0; i < bbRegion.size(); i++) {
@@ -450,7 +464,7 @@ bool basicBlock::executeJIT(state_t *s) {
       if(globals::enableCFG) {
 	cfgCplr = new regionCFG();
 	double now = timestamp();
-	if(cfgCplr->buildCFG(bbRegions)) {
+	if(cfgCplr->buildCFG(bbRegions)) {	  
 	  now = timestamp() - now;
 #if 0
 	  std::cout << now << " seconds to compile with "
@@ -763,18 +777,23 @@ bool basicBlock::hasTermDirectBranchOrJump(uint32_t &target, uint32_t &fallthru)
 }
 
 bool basicBlock::sanityCheck() {
-  
-    for(const auto sbb : succs) {
-      auto it = sbb->preds.find(this);
-      if(it == sbb->preds.end()) {
-	return false;
-      }
+  for(ssize_t i = 0, ni = vecIns.size()-1; i < ni; i++) {
+    if(isBranchOrJump(vecIns.at(i).first)) {
+      std::cerr << * this;
+      die();
     }
-    for(const auto pbb : preds) {
-      auto it = pbb->succs.find(this);
-      if(it == pbb->preds.end()) {
-	return false;
-      }
-    }
-    return true;
   }
+  for(const auto sbb : succs) {
+    auto it = sbb->preds.find(this);
+    if(it == sbb->preds.end()) {
+      return false;
+    }
+  }
+  for(const auto pbb : preds) {
+    auto it = pbb->succs.find(this);
+    if(it == pbb->preds.end()) {
+      return false;
+    }
+  }
+  return true;
+}

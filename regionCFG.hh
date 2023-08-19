@@ -46,12 +46,14 @@ inline std::ostream &operator<<(std::ostream &out, const fprUseEnum &fprState) {
 #undef __fpr_state_list
 
 typedef void (*compiledCFG)
-(uint32_t*, /* pc */
+(
+ uint32_t*, /* pc */
  int32_t*, /* gpr */
  uint8_t*, /* mem */
  uint64_t*, /* icnt */
  uint64_t*, /* abortloc */
- uint64_t*  /* nextbb */
+ uint64_t*,  /* nextbb */
+ uint32_t*  /* abortpc */
  );
 
 

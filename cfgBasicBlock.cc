@@ -60,32 +60,35 @@ void cfgBasicBlock::addWithInCFGEdges(regionCFG *cfg) {
     mit0 = cfg->cfgBlockMap.find(tAddr);
     mit1 = cfg->cfgBlockMap.find(ntAddr);
     if(mit0 != cfg->cfgBlockMap.end()) {
-      //PRINT_ADDED_EDGE(mit0->second);
+      PRINT_ADDED_EDGE(mit0->second);
+      assert(mit0->second->getEntryAddr() == tAddr);
       addSuccessor(mit0->second); 
     }
     if(mit1 != cfg->cfgBlockMap.end()) {
-      //PRINT_ADDED_EDGE(mit1->second);
+      PRINT_ADDED_EDGE(mit1->second);
+      assert(mit1->second->getEntryAddr() == ntAddr);
       addSuccessor(mit1->second); 
     }
   }
-  else if(j!=nullptr or jal != nullptr) {
-    tAddr = j ? j->getJumpAddr() : jal->getJumpAddr();
-    mit0 = cfg->cfgBlockMap.find(tAddr);
-    if(mit0 != cfg->cfgBlockMap.end()) {
-      //PRINT_ADDED_EDGE(mit0->second);
-      addSuccessor(mit0->second);
-    }
-  }
+  
+  //else if(j!=nullptr or jal != nullptr) {
+  //tAddr = j ? j->getJumpAddr() : jal->getJumpAddr();
+  //mit0 = cfg->cfgBlockMap.find(tAddr);
+  //if(mit0 != cfg->cfgBlockMap.end()) {
+  //PRINT_ADDED_EDGE(mit0->second);
+  //addSuccessor(mit0->second);
+  // }
+  //}
   
   /* end-of-block with no branch or jump */
-  else {
-    tAddr = getExitAddr()+4;
-    mit0 = cfg->cfgBlockMap.find(tAddr);
-    if(mit0 != cfg->cfgBlockMap.end()) {
-      //PRINT_ADDED_EDGE(mit0->second);
-      addSuccessor(mit0->second);
-    }
-  }
+  // else {
+  //   tAddr = getExitAddr()+4;
+  //   mit0 = cfg->cfgBlockMap.find(tAddr);
+  //   if(mit0 != cfg->cfgBlockMap.end()) {
+  //     PRINT_ADDED_EDGE(mit0->second);
+  //     addSuccessor(mit0->second);
+  //   }
+  // }
 
 }
 

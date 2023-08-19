@@ -649,9 +649,6 @@ bool regionCFG::buildCFG(std::vector<std::vector<basicBlock*> > &regions) {
   int added_blocks = 0;
   for(auto dbb : discovered) {
     if(blocks.find(dbb) != blocks.end()) {
-      if(dbb->getEntryAddr() == 0x80000dfc) {
-	std::cout << "found dfc bb\n";
-      }
       ++added_blocks;
     }
     blocks.insert(dbb);
@@ -753,20 +750,20 @@ bool regionCFG::buildCFG(std::vector<std::vector<basicBlock*> > &regions) {
 
   /* Speculate that jr's can branch back to 
    * the region head */
-  for(size_t i = 0; i < cfgBlocks.size(); i++) {
-    cfgBasicBlock *cbb = cfgBlocks[i];
-    if(cbb->has_jr_jalr()) {
-      cbb->addSuccessor(cfgMap[head]);
-    }
-  }
+  //for(size_t i = 0; i < cfgBlocks.size(); i++) {
+  //cfgBasicBlock *cbb = cfgBlocks[i];
+  //if(cbb->has_jr_jalr()) {
+  //cbb->addSuccessor(cfgMap[head]);
+  //}
+  //}
 
   /* find edges within cfg not found by 
    * tracing mechanism */
-  for(size_t i = 0; i < cfgBlocks.size(); i++) {
-    cfgBasicBlock *cbb = cfgBlocks[i];
-    cbb->addWithInCFGEdges(this);
-  }
+  //for(size_t i = 0; i < cfgBlocks.size(); i++) {
+  //(cfgBlocks[i])->addWithInCFGEdges(this);
+  //}
 
+  
   for(size_t i = 0; i < cfgBlocks.size(); i++) {
     cfgBasicBlock *cbb = cfgBlocks[i];
     if(!cbb->checkIfPlausableSuccessors()) {
@@ -870,11 +867,11 @@ bool regionCFG::analyzeGraph() {
     die();
   }
 
-  if(globals::dumpIR ) {
+  if(globals::dumpIR || 1) {
     dumpIR();
     dumpLLVM();
   }
-
+  //std::cout << "compiled block with entry of " << std::hex << cfgHead->getEntryAddr() << std::dec << "\n";
 
   return true;
 }
@@ -919,6 +916,9 @@ void regionCFG::initLLVMAndGeneratePreamble() {
   blockArgNames.push_back("abortloc");
   blockArgTypes.push_back(type_iPtr64);
   blockArgNames.push_back("nextbb");
+  blockArgTypes.push_back(type_iPtr32);
+  blockArgNames.push_back("abortpc");
+  
 
   llvm::ArrayRef<llvm::Type*> blockArgs(blockArgTypes);
   blockFunctionType = llvm::FunctionType::get(type_void,blockArgs,false);
@@ -1381,10 +1381,18 @@ llvm::BasicBlock* regionCFG::generateAbortBasicBlock(llvm::Value *abortpc,
   llvm::Value *vPtr = myIRBuilder->CreateBitCast(gep, llvm::Type::getInt32PtrTy(*Context));
   myIRBuilder->CreateStore(abortpc,vPtr);
 
+  std::stringstream ss;
+  ss << "abort_from_" << std::hex << cBB->bb->getEntryAddr() << std::dec;
   llvm::Value *vNPC = llvm::ConstantInt::get(llvm::Type::getInt64Ty(*Context),(uint64_t)(cBB->bb));
-  gep = myIRBuilder->CreateGEP(blockArgMap["abortloc"], offs);
+  gep = myIRBuilder->CreateGEP(blockArgMap["abortloc"], offs, ss.str());
   vPtr = myIRBuilder->CreateBitCast(gep, llvm::Type::getInt64PtrTy(*Context));
   myIRBuilder->CreateStore(vNPC,vPtr);
+
+  llvm::Value *vAPC = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*Context), cBB->getEntryAddr());
+  gep = myIRBuilder->CreateGEP(blockArgMap["abortpc"], offs);
+  vPtr = myIRBuilder->CreateBitCast(gep, llvm::Type::getInt32PtrTy(*Context));
+  myIRBuilder->CreateStore(vAPC,vPtr);
+  
 
   /* we can't statically determine the next basic block */
   llvm::Value *vNBB = llvm::ConstantInt::get(llvm::Type::getInt64Ty(*Context),(uint64_t)nullptr);
@@ -1926,54 +1934,31 @@ static inline void stepRiscv(state_t *s) {
 
 basicBlock* regionCFG::run(state_t *ss) {
   globals::currUnit = this;
-  uint64_t nextbb = 0;
-  uint64_t i0=ss->icnt;
+  uint64_t nextbb = 0, i0=ss->icnt;
+  uint32_t abortpc = 0;
 
-  //std::cout << "run region starting at pc " << std::hex << ss->pc << std::dec << "\n";
-
-  //state_t ts;
-  //memcpy(&ts, ss, sizeof(state_t));
-  //ts.mem = new uint8_t[1UL<<32];
-  //memcpy(ts.mem, ss->mem, 1UL<<32);
-  
+  uint32_t epc = ss->pc;
   codeBits(
 	   &(ss->pc), 
 	   ss->gpr,
 	   ss->mem,
 	   &(ss->icnt),
 	   &(ss->abortloc),
-	   &nextbb
+	   &nextbb,
+	   &abortpc
 	   );
 
   globals::cBB = reinterpret_cast<basicBlock*>(ss->abortloc);
+
+  if(0x80009dd8 == abortpc) {
+    std::cout << "abort to bad bb, entry pc was " << std::hex << epc << std::dec << "\n";
+  }
   //std::cout << "abortpc " << std::hex << globals::cBB->getEntryAddr() << std::dec << "\n";
+  //std::cout << "abortpc " << std::hex << abortpc << std::dec << "\n";
+  
   //std::cout << "pc = " << std::hex << ss->pc << "\n";
   i0 = ss->icnt - i0;
 
-  //std::cout << "ts.icnt = " << ts.icnt << "\n";
-  //std::cout << "pc " << std::hex << ts.pc << std::dec << "\n";
-  //while(ss->icnt != ts.icnt) {
-  //stepRiscv(&ts);
-  //std::cout << "pc " << std::hex << ts.pc << std::dec << "\n";    
-  // }
-  //bool error =  false;
-  //if(ss->pc != ts.pc) {
-  //std::cout << "ts.pc = " << std::hex << ts.pc << std::dec << "\n";
-  //std::cout << "ss.pc = " << std::hex << ss->pc << std::dec << "\n";    
-  //std::cout << "PC MISMATCH\n";
-  //error = true;
-  //}
-  //for(int r = 0; r < 32; ++r) {
-  //if(ss->gpr[r] != ts.gpr[r]) {
-  //error = true;
-  //std::cout << "REG " << r << " MISMATCH\n";
-  //}
-  //}
-  //std::cout << "ts.icnt = " << ts.icnt << "\n";
-  //std::cout << "ss->icnt = " << ss->icnt << "\n";
-  //assert(error==false);
-  //std::cout << "no error\n";
-  //delete [] ts.mem;
  
   //std::cout << "ran " << i0 << " insns\n";
   minIcnt = std::min(minIcnt, i0);
