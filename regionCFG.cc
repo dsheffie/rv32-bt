@@ -594,7 +594,7 @@ bool regionCFG::buildCFG(std::vector<std::vector<basicBlock*> > &regions) {
   }
   std::sort(blockvec.begin(), blockvec.end(), sortByIcnt<basicBlock*>());
   
-  globals::cfgAug = cfgAugEnum::insane;
+  //globals::cfgAug = cfgAugEnum::insane;
   switch(globals::cfgAug)
     {
     case cfgAugEnum::none:
@@ -867,7 +867,7 @@ bool regionCFG::analyzeGraph() {
     die();
   }
 
-  if(globals::dumpIR || 1) {
+  if(globals::dumpIR) {
     dumpIR();
     dumpLLVM();
   }

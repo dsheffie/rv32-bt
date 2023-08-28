@@ -38,6 +38,7 @@
 #define SYS_write 64
 #define SYS_pread 67
 #define SYS_pwrite 68
+#define SYS_stat 78
 #define SYS_fstatat 79
 #define SYS_fstat 80
 #define SYS_exit 93
@@ -592,6 +593,10 @@ void handle_syscall(state_t *s, uint64_t tohost) {
       buf[0] = rc;
       break;
     }
+    case SYS_stat : {
+      buf[0] = 0;
+      break;
+    }      
     default:
       std::cout << "syscall " << buf[0] << " unsupported\n";
       exit(-1);
