@@ -333,6 +333,11 @@ void execRiscv(state_t *s) {
 	      case 0x0:
 		s->gpr[m.r.rd] = s->gpr[m.r.rs1] << (s->gpr[m.r.rs2] & 31);
 		break;
+	      case 0x1: { /* MULH */
+		int64_t t = static_cast<int64_t>(s->gpr[m.r.rs1]) * static_cast<int64_t>(s->gpr[m.r.rs2]);
+		s->gpr[m.r.rd] = (t>>32);
+		break;
+	      }		
 	      default:
 		std::cout << "sel = " << m.r.sel << ", special = " << m.r.special << "\n";
 		assert(0);
@@ -557,6 +562,8 @@ void handle_syscall(state_t *s, uint64_t tohost) {
     return;
   }
   uint64_t *buf = reinterpret_cast<uint64_t*>(mem + tohost);
+  globals::syscall_histo[buf[0]]++;
+  
   switch(buf[0])
     {
     case SYS_write: /* int write(int file, char *ptr, int len) */
@@ -579,6 +586,7 @@ void handle_syscall(state_t *s, uint64_t tohost) {
       break;
     }
     case SYS_read: {
+      //std::cout << "performing " << buf[3] << " sized read\n";
       buf[0] = read(buf[1], reinterpret_cast<char*>(s->mem + buf[2]), buf[3]); 
       break;
     }

@@ -64,6 +64,7 @@ namespace globals {
   std::map<std::string, uint32_t> symtab;
   uint64_t tohost_addr = 0;
   uint64_t fromhost_addr = 0;
+  std::map<uint32_t, uint64_t> syscall_histo;
 }
 
 perfmap* perfmap::theInstance = nullptr;
@@ -381,7 +382,12 @@ int main(int argc, char *argv[]) {
   delete s;
   llvm::llvm_shutdown();
   debugSymDB::release();
-  stopCapstone(); 
+  stopCapstone();
+
+  for(auto &p : globals::syscall_histo) {
+    std::cout << "syscall " << p.first << "," << p.second << "\n";
+  }
+  
   return 0;
 }
 

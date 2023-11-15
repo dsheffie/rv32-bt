@@ -47,6 +47,7 @@ namespace globals {
   extern uint64_t fromhost_addr;
   extern std::map<std::string, uint32_t> symtab;
   extern bool log;
+  extern std::map<uint32_t, uint64_t> syscall_histo;
 #ifndef ELIDE_LLVM
   extern llvm::CodeGenOpt::Level regionOptLevel;
 #endif
