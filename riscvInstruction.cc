@@ -217,16 +217,16 @@ void Insn::codeGen(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
 void rTypeInsn::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
   cfg->gprDefinitionBlocks[r.r.rd].insert(cBB);
 }
+
 void rTypeInsn::recUses(cfgBasicBlock *cBB) {
   cBB->gprRead[r.r.rs1]=true;
   cBB->gprRead[r.r.rs2]=true;
 }
 
-
-
 void insn_jalr::recDefines(cfgBasicBlock *cBB, regionCFG *cfg) {
-  cBB->gprRead[r.r.rd]=true;  
+  cfg->gprDefinitionBlocks[r.r.rd].insert(cBB);
 }
+
 void insn_jalr::recUses(cfgBasicBlock *cBB) {
   cBB->gprRead[r.r.rs1]=true;  
 }
