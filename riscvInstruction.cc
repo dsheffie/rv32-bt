@@ -188,7 +188,6 @@ void Insn::set(regionCFG *cfg, cfgBasicBlock *cBB) {
 }
 
 void Insn::emitPrintPC() {
-#if 1
   llvm::LLVMContext &cxt = *(cfg->Context);
   llvm::Type *iType32 = llvm::Type::getInt32Ty(cxt);
   llvm::Value *vAddr = llvm::ConstantInt::get(iType32,addr);
@@ -196,7 +195,6 @@ void Insn::emitPrintPC() {
   argVector.push_back(vAddr);
   llvm::ArrayRef<llvm::Value*> cArgs(argVector);
   cfg->myIRBuilder->CreateCall(cfg->builtinFuncts["print_pc"],cArgs);
-#endif
 }
 
 void Insn::saveInstAddress() {
@@ -477,7 +475,17 @@ bool rTypeInsn::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
 	  vRD = cfg->myIRBuilder->CreateAnd(regTbl.gprTbl[r.r.rs2], vM5);
 	  vRD = cfg->myIRBuilder->CreateShl(regTbl.gprTbl[r.r.rs1], vRD);
 	  break;
-	default:
+	case 0x1: {/* mulu */
+	  llvm::Type *iType64 = llvm::Type::getInt64Ty(cxt);
+	  llvm::Value *vRS = cfg->myIRBuilder->CreateSExt(regTbl.gprTbl[r.r.rs1], iType64);
+	  llvm::Value *vRT = cfg->myIRBuilder->CreateSExt(regTbl.gprTbl[r.r.rs2], iType64);
+	  llvm::Value *vMul = cfg->myIRBuilder->CreateMul(vRS,vRT);
+	  llvm::Value *v32 = llvm::ConstantInt::get(iType64,32);
+	  llvm::Value *vShft = cfg->myIRBuilder->CreateAShr(vMul, v32);	  
+	  vRD = cfg->myIRBuilder->CreateTrunc(vShft, iType32);
+	  break;
+	}
+	default:	  
 	  die();
 	}
       break;
@@ -504,7 +512,9 @@ bool rTypeInsn::generateIR(cfgBasicBlock *cBB, llvmRegTables& regTbl) {
 	  llvm::Value *vZRS = cfg->myIRBuilder->CreateZExt(regTbl.gprTbl[r.r.rs1], iType64);
 	  llvm::Value *vZRT = cfg->myIRBuilder->CreateZExt(regTbl.gprTbl[r.r.rs2], iType64);
 	  llvm::Value *vMul = cfg->myIRBuilder->CreateMul(vZRS,vZRT);
-	  vRD = cfg->myIRBuilder->CreateTrunc(vMul, iType32);
+	  llvm::Value *v32 = llvm::ConstantInt::get(iType64,32);
+	  llvm::Value *vShft = cfg->myIRBuilder->CreateLShr(vMul, v32);	  
+	  vRD = cfg->myIRBuilder->CreateTrunc(vShft, iType32);
 	  break;
 	}
 	default:

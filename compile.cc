@@ -18,29 +18,14 @@ bool compile::canCompileInstr(uint32_t inst) {
     case 0x23: /* stores */
     case 0x37: /* lui */
     case 0x17: /* auipc */
+      return true;
     case 0x67: /* jalr */
     case 0x6f: /* jal */
+      return true;
     case 0x33:  /* reg + reg insns */
       return true;
-    case 0x63: {/* branches */
-      // riscv_t m(inst);
-      // switch(m.b.sel)
-      // 	{
-      // 	case 0: /* beq */
-      // 	case 1: /* bne */
-      // 	case 4: /* blt */
-      // 	case 5: /* bge */
-      // 	  return true;
-      // 	case 6: /* bltu */
-      // 	case 7: /* bgeu */
-      // 	  return false;
-      // 	  break;
-      // 	default:
-      // 	  break;
-      // 	}      
+    case 0x63:      
       return true;
-    }
-    break;
     case 0x73:
       //std::cout << "opcode stops bt " << std::hex << opcode << std::dec << "\n";
       rc = false;
