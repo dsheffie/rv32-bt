@@ -42,6 +42,7 @@
 #define SYS_fstatat 79
 #define SYS_fstat 80
 #define SYS_exit 93
+#define SYS_gettimeofday 94
 #define SYS_lstat 1039
 #define SYS_getmainvars 2011
 
@@ -616,7 +617,15 @@ void handle_syscall(state_t *s, uint64_t tohost) {
     case SYS_stat : {
       buf[0] = 0;
       break;
-    }      
+    }
+    case SYS_gettimeofday: {
+      static_assert(sizeof(struct timeval)==16, "timeval has wrong size");
+      struct timeval *tp = reinterpret_cast<struct timeval*>(s->mem + buf[1]);
+      struct timezone *tzp = reinterpret_cast<struct timezone*>(s->mem + buf[2]);
+      buf[0] = gettimeofday(tp, tzp);
+      break;
+    }
+      
     default:
       std::cout << "syscall " << buf[0] << " unsupported\n";
       exit(-1);
