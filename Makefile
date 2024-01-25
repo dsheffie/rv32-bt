@@ -17,14 +17,14 @@ ifeq ($(UNAME_S),FreeBSD)
 endif
 
 ifeq ($(UNAME_S),Darwin)
-     LLVM_CXXFLAGS = $(shell llvm-config-mp-11 --cppflags)
-     LLVM_LDFLAGS = $(shell llvm-config-mp-11 --ldflags --libs all)
+     LLVM_CXXFLAGS = $(shell llvm-config-mp-14 --cppflags)
+     LLVM_LDFLAGS = $(shell llvm-config-mp-14 --ldflags --libs all)
      CXX = clang++ -fomit-frame-pointer -I/opt/local/include
      EXTRA_LD = -L/opt/local/lib -lboost_program_options-mt -lcapstone
 endif
 
 
-CXXFLAGS = -std=c++14 -g $(OPT) $(LLVM_CXXFLAGS)
+CXXFLAGS = -std=c++17 -g $(OPT) $(LLVM_CXXFLAGS)
 
 
 OPT = -g -O3 -Wall -Wpedantic -Wextra -Wno-unused-parameter -ferror-limit=1

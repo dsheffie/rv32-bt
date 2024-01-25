@@ -34,5 +34,9 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Support/DynamicLibrary.h"
 
+
+#define MakeGEP(PTR, IDX) CreateGEP((PTR)->getType()->getPointerElementType(), (PTR), (IDX))
+#define MakeLoad(PTR, NAME) CreateLoad((PTR)->getType()->getPointerElementType(), (PTR), (NAME))
+
 #endif
 
