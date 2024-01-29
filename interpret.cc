@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/times.h>
 #include <fcntl.h>
 #include "basicBlock.hh"   // for basicBlock
 #include "disassemble.hh"  // for getCondName
@@ -43,6 +44,7 @@
 #define SYS_fstat 80
 #define SYS_exit 93
 #define SYS_gettimeofday 94
+#define SYS_times 95
 #define SYS_lstat 1039
 #define SYS_getmainvars 2011
 
@@ -625,7 +627,22 @@ void handle_syscall(state_t *s, uint64_t tohost) {
       buf[0] = gettimeofday(tp, tzp);
       break;
     }
-      
+    case SYS_times: {
+      struct tms32 {
+        uint32_t tms_utime;
+        uint32_t tms_stime;  /* system time */
+        uint32_t tms_cutime; /* user time of children */
+        uint32_t tms_cstime; /* system time of children */
+      };
+      tms32 *t = reinterpret_cast<tms32*>(s->mem + buf[1]);
+      struct tms tt;
+      buf[0] = times(&tt);
+      t->tms_utime = tt.tms_utime;
+      t->tms_stime = tt.tms_stime;
+      t->tms_cutime = tt.tms_cutime;
+      t->tms_cstime = tt.tms_cstime;
+      break;
+    }      
     default:
       std::cout << "syscall " << buf[0] << " unsupported\n";
       exit(-1);
