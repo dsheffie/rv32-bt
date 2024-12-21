@@ -95,27 +95,6 @@ int buildArgcArgv(const char *filename, const std::string &sysArgs, char ** &arg
 
 static jmp_buf jenv;
 
-static void catchUnixSignal(int sig) {
-  switch(sig)
-    {
-    case SIGFPE:
-      std::cerr << KRED << "\ncaught SIGFPE!\n" << KNRM;
-      if(globals::currUnit) {
-	globals::currUnit->info();
-      }
-      exit(-1);
-      break;
-    case SIGINT:
-      std::cerr << KRED << "\ncaught SIGINT!\n" << KNRM;
-      s->brk = 1;
-      longjmp(jenv, 1);
-      break;
-    default:
-      break;
-    }
-
-}
-
 
 int main(int argc, char *argv[]) {
   static_assert(sizeof(riscv_t)==4, "mips union borked");
@@ -203,13 +182,6 @@ int main(int argc, char *argv[]) {
     simPointsFname = filename + "_" + std::to_string(rand()) + ".sp";
   }
   
-#ifndef __APPLE__
-  if(fp_exception) {
-    feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
-    signal(SIGFPE, catchUnixSignal);
-  }
-  signal(SIGINT, catchUnixSignal);
-#endif
   
   /* Build argc and argv */
   sysArgc = buildArgcArgv(filename.c_str(),sysArgs,sysArgv);
@@ -384,9 +356,9 @@ int main(int argc, char *argv[]) {
   debugSymDB::release();
   stopCapstone();
 
-  for(auto &p : globals::syscall_histo) {
-    std::cout << "syscall " << p.first << "," << p.second << "\n";
-  }
+  //for(auto &p : globals::syscall_histo) {
+  //std::cout << "syscall " << p.first << "," << p.second << "\n";
+  //}
   
   return 0;
 }

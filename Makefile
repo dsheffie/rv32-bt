@@ -1,9 +1,9 @@
 UNAME_S = $(shell uname -s)
 LIBS =  $(EXTRA_LD) -lpthread -lffi -lcurses -lz
 ifeq ($(UNAME_S),Linux)
-     LLVM_CXXFLAGS = $(shell llvm-config-13 --cppflags)
-     LLVM_LDFLAGS = $(shell llvm-config-13 --ldflags --libs all)
-     CXX = clang++ -fomit-frame-pointer -flto=thin
+     LLVM_CXXFLAGS = $(shell llvm-config-14 --cppflags)
+     LLVM_LDFLAGS = $(shell llvm-config-14 --ldflags --libs all)
+     CXX = clang++ -fomit-frame-pointer -flto
      EXTRA_LD = -ldl -lffi -lbfd -lboost_program_options -lunwind -lcapstone
      DL = -Wl,--export-dynamic 
 endif
@@ -17,19 +17,19 @@ ifeq ($(UNAME_S),FreeBSD)
 endif
 
 ifeq ($(UNAME_S),Darwin)
-     LLVM_CXXFLAGS = $(shell llvm-config-mp-11 --cppflags)
-     LLVM_LDFLAGS = $(shell llvm-config-mp-11 --ldflags --libs all)
+     LLVM_CXXFLAGS = $(shell llvm-config-mp-14 --cppflags)
+     LLVM_LDFLAGS = $(shell llvm-config-mp-14 --ldflags --libs all)
      CXX = clang++ -fomit-frame-pointer -I/opt/local/include
      EXTRA_LD = -L/opt/local/lib -lboost_program_options-mt -lcapstone
 endif
 
 
-CXXFLAGS = -std=c++14 -g $(OPT) $(LLVM_CXXFLAGS)
+CXXFLAGS = -std=c++17 -g $(OPT) $(LLVM_CXXFLAGS)
 
 
 OPT = -g -O3 -Wall -Wpedantic -Wextra -Wno-unused-parameter -ferror-limit=1
 EXE = cfg_rv32
-OBJ = main.o cfgBasicBlock.o loadelf.o disassemble.o helper.o interpret.o basicBlock.o compile.o region.o riscvInstruction.o regionCFG.o perfmap.o debugSymbols.o saveState.o simPoints.o githash.o state.o
+OBJ = main.o cfgBasicBlock.o loadelf.o disassemble.o helper.o interpret.o basicBlock.o compile.o region.o riscvInstruction.o regionCFG.o perfmap.o debugSymbols.o saveState.o simPoints.o githash.o state.o m1cycles.o
 DEP = $(OBJ:.o=.d)
 
 .PHONY: all clean

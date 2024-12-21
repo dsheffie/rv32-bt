@@ -258,9 +258,9 @@ llvm::Value *llvmRegTables::loadGPR(uint32_t gpr) {
     } 
     else {
       Value *offs = ConstantInt::get(Type::getInt32Ty(*cfg->Context),gpr);
-      Value *gep = myIRBuilder->CreateGEP(cfg->blockArgMap["gpr"], offs);
+      Value *gep = myIRBuilder->MakeGEP(cfg->blockArgMap["gpr"], offs);
       std::string ldName = getGPRName(gpr) + "_" + std::to_string(cfg->getuuid()++);
-      Value *ld = myIRBuilder->CreateLoad(gep,ldName);
+      Value *ld = myIRBuilder->MakeLoad(gep,ldName);
       gprTbl[gpr] = ld;
     }
   }
@@ -338,20 +338,24 @@ llvm::Value *llvmRegTables::loadFPR(uint32_t fpr) {
 
   llvm::Value *offs = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*cfg->Context),fpr);
   llvm::Value *basePtr = cfg->blockArgMap.at("cpr1");
-  llvm::Value *gep = myIRBuilder->CreateGEP(basePtr, offs);
+  llvm::Value *gep = myIRBuilder->MakeGEP(basePtr, offs);
   dbt_assert(gep && "no gep!");
-
+  llvm::Value *ld = nullptr;
+  std::string ldName = "f" + std::to_string(fpr) + "_" + std::to_string(cfg->getuuid()++);
   if(cfg->allFprTouched[fpr]==fprUseEnum::singlePrec) {
     gep = myIRBuilder->CreatePointerCast(gep, llvm::Type::getFloatPtrTy(*cfg->Context));
+    ld = myIRBuilder->MakeLoad(gep,ldName);
   }
   else if(cfg->allFprTouched[fpr]==fprUseEnum::doublePrec) {
     gep = myIRBuilder->CreatePointerCast(gep, llvm::Type::getDoublePtrTy(*cfg->Context));
+    ld = myIRBuilder->MakeLoad(gep,ldName);
   }
   else {
     gep = myIRBuilder->CreatePointerCast(gep, llvm::Type::getFloatPtrTy(*cfg->Context));
+    ld = myIRBuilder->MakeLoad(gep,ldName);
   }
-  std::string ldName = "f" + std::to_string(fpr) + "_" + std::to_string(cfg->getuuid()++);
-  llvm::Value *ld = myIRBuilder->CreateLoad(gep,ldName);
+
+  
   dbt_assert(ld && "no load");
   fprTbl[fpr] = ld;
   return fprTbl[fpr];
@@ -364,17 +368,17 @@ llvm::Value *llvmRegTables::loadFCR(uint32_t fcr) {
 
   llvm::Value *offs = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*cfg->Context),fcr);
   llvm::Value *basePtr = cfg->blockArgMap.at("fcr1");
-  llvm::Value *gep = myIRBuilder->CreateGEP(basePtr, offs);
+  llvm::Value *gep = myIRBuilder->MakeGEP(basePtr, offs);
   gep = myIRBuilder->CreatePointerCast(gep, llvm::Type::getInt32PtrTy(*cfg->Context));
-  fcrTbl[fcr] = myIRBuilder->CreateLoad(gep);
+  fcrTbl[fcr] = myIRBuilder->MakeLoad(gep, "");
   return fcrTbl[fcr];
 }
 
 void llvmRegTables::initIcnt() {
   llvm::Type *iType64 = llvm::Type::getInt64Ty(*(cfg->Context));
   llvm::Value *vZ = llvm::ConstantInt::get(iType64,0);
-  llvm::Value *vG = myIRBuilder->CreateGEP(cfg->blockArgMap["icnt"], vZ);
-  iCnt = myIRBuilder->CreateLoad(vG);
+  llvm::Value *vG = myIRBuilder->MakeGEP(cfg->blockArgMap["icnt"], vZ);
+  iCnt = myIRBuilder->MakeLoad(vG, "");
 }
 
 void llvmRegTables::incrIcnt(size_t amt) {
@@ -386,20 +390,20 @@ void llvmRegTables::storeIcnt() {
   using namespace llvm;
   Type *iType64 = Type::getInt64Ty(*(cfg->Context));
   Value *vZ = ConstantInt::get(iType64,0);
-  Value *vG = myIRBuilder->CreateGEP(cfg->blockArgMap["icnt"], vZ);
+  Value *vG = myIRBuilder->MakeGEP(cfg->blockArgMap["icnt"], vZ);
   myIRBuilder->CreateStore(iCnt, vG);
 }
 void llvmRegTables::storeGPR(uint32_t gpr) {
   using namespace llvm;
   Value *offs = ConstantInt::get(Type::getInt32Ty(*(cfg->Context)),gpr);
-  Value *gep = myIRBuilder->CreateGEP(cfg->blockArgMap["gpr"], offs);
+  Value *gep = myIRBuilder->MakeGEP(cfg->blockArgMap["gpr"], offs);
   myIRBuilder->CreateStore(gprTbl[gpr], gep);
 }
 void llvmRegTables::storeFPR(uint32_t fpr) {
   using namespace llvm;
   Value *offs = ConstantInt::get(Type::getInt32Ty(*cfg->Context),fpr);
   Value *basePtr = cfg->blockArgMap.at("cpr1");
-  Value *gep = myIRBuilder->CreateGEP(basePtr, offs);
+  Value *gep = myIRBuilder->MakeGEP(basePtr, offs);
   dbt_assert(gep && "no gep!");
 
   if(cfg->allFprTouched[fpr]==fprUseEnum::singlePrec) {
@@ -420,7 +424,7 @@ void llvmRegTables::storeFPR(uint32_t fpr) {
 void llvmRegTables::storeFCR(uint32_t fcr) {
   using namespace llvm;
   Value *offs = ConstantInt::get(Type::getInt32Ty(*(cfg->Context)),fcr);
-  Value *gep = myIRBuilder->CreateGEP(cfg->blockArgMap["fcr1"], offs);
+  Value *gep = myIRBuilder->MakeGEP(cfg->blockArgMap["fcr1"], offs);
   myIRBuilder->CreateStore(fcrTbl[fcr], gep);
 }
 
@@ -1377,26 +1381,26 @@ llvm::BasicBlock* regionCFG::generateAbortBasicBlock(llvm::Value *abortpc,
 
   //flush PC
   llvm::Value *offs = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*Context),0);
-  llvm::Value *gep = myIRBuilder->CreateGEP(blockArgMap["pc"], offs);
+  llvm::Value *gep = myIRBuilder->MakeGEP(blockArgMap["pc"], offs);
   llvm::Value *vPtr = myIRBuilder->CreateBitCast(gep, llvm::Type::getInt32PtrTy(*Context));
   myIRBuilder->CreateStore(abortpc,vPtr);
 
   std::stringstream ss;
   ss << "abort_from_" << std::hex << cBB->bb->getEntryAddr() << std::dec;
   llvm::Value *vNPC = llvm::ConstantInt::get(llvm::Type::getInt64Ty(*Context),(uint64_t)(cBB->bb));
-  gep = myIRBuilder->CreateGEP(blockArgMap["abortloc"], offs, ss.str());
+  gep = myIRBuilder->MakeGEP(blockArgMap["abortloc"], offs);
   vPtr = myIRBuilder->CreateBitCast(gep, llvm::Type::getInt64PtrTy(*Context));
   myIRBuilder->CreateStore(vNPC,vPtr);
 
   llvm::Value *vAPC = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*Context), cBB->getEntryAddr());
-  gep = myIRBuilder->CreateGEP(blockArgMap["abortpc"], offs);
+  gep = myIRBuilder->MakeGEP(blockArgMap["abortpc"], offs);
   vPtr = myIRBuilder->CreateBitCast(gep, llvm::Type::getInt32PtrTy(*Context));
   myIRBuilder->CreateStore(vAPC,vPtr);
   
 
   /* we can't statically determine the next basic block */
   llvm::Value *vNBB = llvm::ConstantInt::get(llvm::Type::getInt64Ty(*Context),(uint64_t)nullptr);
-  gep = myIRBuilder->CreateGEP(blockArgMap["nextbb"], offs);
+  gep = myIRBuilder->MakeGEP(blockArgMap["nextbb"], offs);
   vPtr = myIRBuilder->CreateBitCast(gep, llvm::Type::getInt64PtrTy(*Context));
   myIRBuilder->CreateStore(vNBB,vPtr);
 
