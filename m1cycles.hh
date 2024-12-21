@@ -16,6 +16,10 @@ struct performance_counters {
       : cycles(init), branches(init), missed_branches(init),
         instructions(init) {}
 
+  double computeIPC() const {
+    return (cycles==0.0) ? 0.0 : instructions / cycles; 
+  }
+  
   inline performance_counters &operator-=(const performance_counters &other) {
     cycles -= other.cycles;
     branches -= other.branches;

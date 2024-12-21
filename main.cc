@@ -23,6 +23,7 @@
 #include "debugSymbols.hh"
 #include "globals.hh"
 #include "simPoints.hh"
+#include "m1cycles.hh"
 
 extern const char* githash;
 int sArgc = -1;
@@ -107,6 +108,7 @@ int main(int argc, char *argv[]) {
 	    << "git hash=" << githash
 	    << KNRM << "\n";
 
+  setup_performance_counters();
 
   globals::binaryName = strip_path(argv[0]);
   llvm::InitializeNativeTarget();
@@ -220,7 +222,8 @@ int main(int argc, char *argv[]) {
   globals::regionFinder = new region(cl, hotThresh);
   globals::cBB = new basicBlock(s->pc);
   initCapstone();
-  
+
+  performance_counters cnt0 = get_counters();
   estart = timestamp();
   if(setjmp(jenv) > 0) {
     std::cerr << globals::binaryName << ": returning from longjmp\n";
@@ -239,6 +242,8 @@ int main(int argc, char *argv[]) {
     }
   }
   estop = timestamp();
+  cnt0 -= get_counters();
+  
   double runtime = (estop-estart);
   struct rusage usage;
   uint64_t dupIns = 0;
@@ -252,8 +257,8 @@ int main(int argc, char *argv[]) {
   std::cerr << KGRN << globals::binaryName << " statistics\n"
 	    << "\t"
 	    << runtime << " sec, "
-	    << s->icnt
-	    << " ins executed"
+	    << cnt0.computeIPC() << " host IPC, "
+	    << s->icnt << " rv32 ins executed"
 	    << " (" << regionCFG::icnt << " cfg), "
 	    << std::round(s->icnt / (runtime*1e6))
 	    << " megains/sec" << "\n"

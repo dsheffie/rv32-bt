@@ -138,12 +138,7 @@ void setup_performance_counters(void) {
 }
 
 extern performance_counters get_counters(void) {
-  static bool warned = false;
   if (kpc_get_thread_counters(0, COUNTERS_COUNT, g_counters)) {
-    if (!warned) {
-      printf("kpc_get_thread_counters failed, run as sudo?\n");
-      warned = true;
-    }
     return 1;
   }
   // g_counters[3 + 2] gives you the number of instructions 'decoded'
