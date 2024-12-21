@@ -1,9 +1,9 @@
 UNAME_S = $(shell uname -s)
 LIBS =  $(EXTRA_LD) -lpthread -lffi -lcurses -lz
 ifeq ($(UNAME_S),Linux)
-     LLVM_CXXFLAGS = $(shell llvm-config-11 --cppflags)
-     LLVM_LDFLAGS = $(shell llvm-config-11 --ldflags --libs all)
-     CXX = clang++-12 -fomit-frame-pointer -flto=thin
+     LLVM_CXXFLAGS = $(shell llvm-config-14 --cppflags)
+     LLVM_LDFLAGS = $(shell llvm-config-14 --ldflags --libs all)
+     CXX = clang++ -fomit-frame-pointer -flto
      EXTRA_LD = -ldl -lffi -lbfd -lboost_program_options -lunwind -lcapstone
      DL = -Wl,--export-dynamic 
 endif

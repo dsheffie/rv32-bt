@@ -182,13 +182,6 @@ int main(int argc, char *argv[]) {
     simPointsFname = filename + "_" + std::to_string(rand()) + ".sp";
   }
   
-#ifndef __APPLE__
-  if(fp_exception) {
-    feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
-    signal(SIGFPE, catchUnixSignal);
-  }
-  signal(SIGINT, catchUnixSignal);
-#endif
   
   /* Build argc and argv */
   sysArgc = buildArgcArgv(filename.c_str(),sysArgs,sysArgv);
