@@ -7,14 +7,14 @@
  * https://gist.github.com/dougallj/5bafb113492047c865c0c8cfbc930155#file-m1_robsize-c-L390
  *
  */
+#include "m1cycles.hh"
+
 
 #ifdef __APPLE__
-
-#include "m1cycles.hh"
-#include <dlfcn.h>
-#include <pthread.h>
 #include <cstdio>
 #include <cstdlib>
+#include <dlfcn.h>
+#include <pthread.h>
 
 #define KPERF_LIST                                                             \
   /*  ret, name, params */                                                     \
@@ -137,7 +137,11 @@ void setup_performance_counters(void) {
   configure_rdtsc();
 }
 
-extern performance_counters get_counters(void) {
+void stop_performance_counters(void) {
+
+}
+
+performance_counters get_counters(void) {
   if (kpc_get_thread_counters(0, COUNTERS_COUNT, g_counters)) {
     return 1;
   }
@@ -145,6 +149,69 @@ extern performance_counters get_counters(void) {
   // whereas g_counters[1] might give you the number of instructions 'retired'.
   return performance_counters{g_counters[0 + 2], g_counters[3 + 2],
                               g_counters[4 + 2], g_counters[5 + 2]};
+}
+
+#elif __linux__
+#define __GNU_SOURCE
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <time.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <sys/time.h>
+#include <cassert>
+#include <cstdint>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <linux/unistd.h>
+#include <linux/perf_event.h>
+#include <linux/hw_breakpoint.h>
+#include <sched.h>
+#include <sys/ioctl.h>
+
+static int perf_fds[4] = {-1};
+
+void setup_performance_counters(void) {
+  struct perf_event_attr pe;
+  memset(&pe, 0, sizeof(pe));
+  pe.type = PERF_TYPE_HARDWARE;
+  pe.size = sizeof(pe);
+  pe.disabled = 0;
+  int cpu = sched_getcpu();
+  pe.config = PERF_COUNT_HW_CPU_CYCLES;  
+  perf_fds[0] = syscall(__NR_perf_event_open, &pe, 0, cpu, -1, 0);
+  if(perf_fds[0] < 0) perror("WTF");
+
+  pe.config = PERF_COUNT_HW_BRANCH_INSTRUCTIONS;
+  perf_fds[1] = syscall(__NR_perf_event_open, &pe, 0, cpu, -1, 0);
+  if(perf_fds[1] < 0) perror("WTF");
+
+  pe.config = PERF_COUNT_HW_BRANCH_MISSES;
+  perf_fds[2] = syscall(__NR_perf_event_open, &pe, 0, cpu, -1, 0);
+  if(perf_fds[2] < 0) perror("WTF");  
+  
+  pe.config = PERF_COUNT_HW_INSTRUCTIONS;
+  perf_fds[3] = syscall(__NR_perf_event_open, &pe, 0, cpu, -1, 0);
+  if(perf_fds[3] < 0) perror("WTF");
+
+}
+
+void stop_performance_counters(void) {
+  for(int i = 0; i < 4; i++) {
+    if(perf_fds[i] != -1) {
+      close(perf_fds[i]);
+    }
+  }
+}
+
+performance_counters get_counters(void) {
+  uint64_t cycles, inst;
+  ssize_t rc;
+  rc = read(perf_fds[0], &cycles, sizeof(cycles));
+  assert(rc == sizeof(cycles));
+  rc = read(perf_fds[3], &inst, sizeof(inst));
+  return performance_counters{cycles,0UL,0UL,inst};
 }
 
 #endif
